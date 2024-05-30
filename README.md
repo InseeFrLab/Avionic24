@@ -8,6 +8,11 @@ Avionic 2 is a package designed to reproduce the results of the INSEE working pa
 
 More generally, this package can also be used to manipulate multi-regional databases, to calculate carbon footprints using MRIO, to calculate structural path analysis (SPA), and to use the functions created as part of the working paper to apply the results to other countries, for example, or with additional modeling.
 
+To install the package:
+
+``` r
+devtools::install_github("InseeFrLab/avionic24")
+```
 
 ## Structure of the Code
 

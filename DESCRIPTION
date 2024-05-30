@@ -1,0 +1,26 @@
+Package: Avionic24
+Type: Package
+Title: What the Package Does (Title Case)
+Version: 0.1.0
+Author: Who wrote it
+Maintainer: The package maintainer <yourself@somewhere.net>
+Description: More about what it does (maybe more than one line)
+    Use four spaces when indenting paragraphs within the Description.
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true
+Imports: Rcpp (>= 1.0.11), 
+  RcppArmadillo,
+  data.table,
+  tictoc,
+  xlsx,
+  dplyr,
+  stringr,
+  readxl,
+  ggplot2
+LinkingTo: Rcpp, RcppArmadillo
+RoxygenNote: 7.3.1
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr

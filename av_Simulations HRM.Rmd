@@ -1,0 +1,1230 @@
+---
+title: "Simulation of substitution between imports and domestic production (Hypothetical Repatriation Method)"
+output: html_notebook
+---
+
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  eval = FALSE,
+  echo = TRUE
+)
+```
+
+#0. Introduction
+
+In short : 
+
+Simulates substitution between imports and domestic production by modifying an MRIO with unchanged world GDP (counterfactual situation). Given that the Figaro database has the most recent years available, and in particular 2019, which we are using as the reference year in this analysis (the most recent pre-covid year), the HRM calculations presented here are adapted to Figaro and have not necessarily been tested with other MRIOs.
+
+In detail :
+
+The attractiveness of an economy is measured by its ability to attract foreign direct investment, which contributes to activity and employment. It is sometimes embodied in the media by the establishment of giant factories (gigafactories) on national territory. Locating investment within the country has a direct impact on employment and added value, as well as on carbon emissions, but it also has indirect effects through the reorganization of local and international value chains. Conversely, when the investment is located abroad, which entails importing products (finished products or intermediate inputs for French companies), the impact on business and greenhouse gas emissions is very different. Simulations are used to compare the economic and environmental consequences of these two situations, depending on whether a plant is set up in France or abroad. The exercise is carried out on the basis of identical final demand in both situations for all products, in France and abroad, with unchanged production structure and factor prices. The aim of the simulations is not to identify the conditions that will enable a business to locate in France, but to measure orders of magnitude by highlighting the differences between sectors, particularly in manufacturing industry, where vulnerability issues are  concentrated, and where location choices between countries are guided more by the logic of attractiveness than in most services.
+
+The simulations compare two situations: one in which a new plant is set up in France, and one in which it is established abroad. The difference between these two situations is modeled with the substitution of a portion of goods imports by domestic production, with unchanged total demand. They do not explicitly model the instruments that would enable this objective of substituting part of imports with domestic production to be achieved, but they do illustrate the knock-on effects linked to the entanglement of value chains as traced in international input-output tables. This is a theoretical exercise, which highlights some of the mechanisms at play and gives orders of magnitude for the induced effects in terms of emissions and jobs.
+
+The simulations are based on several assumptions. The activity substituted for imports is assumed to be produced under the same conditions as domestic production: producing 1 additional euro of a good in a given country requires the same intermediate consumption, the same employment and generates as many emissions as the current production of 1 euro of the same good in that country. We also assume that the good whose production is localized in France rather than imported from abroad is perfectly substitutable for a good produced elsewhere. Final demand for this good (whatever the country of production) is unchanged by the choice of location: we always consume the same quantity of the good whether it is produced in France or elsewhere. Similarly, in relative terms, the use of this good remains unchanged: the breakdown of the good produced in France between what is consumed in France and what is exported, and between what is used for final demand and for intermediate consumption, is fixed.
+
+In practice, the simulations simulate an increase in value added of €1 bn ex-ante for a given branch: formally, for a branch k0 , if France's initial production (indexed by i0 ) was P(i0,k0) , corresponding to an initial value added of
+
+VA(i0,k0) = (1 - ∑i,k A(i,k,i0,k0))P(i0,k0) , this means that production is increased by α = 100 / VA(i0,k0) %.
+
+Locating goods production in France rather than importing it from abroad results in an α% increase in the technical coefficients (domestic and exported) of the line indicated by (i0 , k0 ) of the TIES and the line indicated by (i0 ,k0 ) of each country's final demand (i.e. consumption of goods in branch k0 that are produced in country i0 ). And then, by lowering the technical coefficients and final demand on lines k0 corresponding to imports from all other countries in the world (except France).
+
+Formally, the R operator modifies the structure of the matrix of technical coefficients A and final demand by country. R thus transforms the matrix A into B = R(A,i0, k0, α) :
+
+where the branch whose activity is located in France rather than abroad is k0 in country i0 . R transforms final demand in the same way, with branch l playing no role, since there are only three dimensions (i,k,j).
+
+The production of each branch of the world economy adjusts to this demand and to this structure of intermediate consumption:
+
+Total final demand for each product in each country is unchanged, so world GDP, which is also equal to total world final demand, is unchanged.
+
+The evolution of the GDP of country j is given by the evolution of the sum of the value added of the branches:
+
+For each simulation, a production multiplier is calculated by relating the evolution of French production ex-post to the evolution of production ex-ante, i.e. :
+∑ l {P(i0,k0,α)(j,l) - P(j,l)} / (α P(i0,k0)).
+
+Noting w(j,l) the employment content of the output of branch l in country j, i.e. the number of jobs in this branch divided by the output of this branch, the evolution of employment in country j is given by: ∑ lw(j,l) x (P(i0,k0,α)(j,l) - P(j,l)).
+
+#1. Different uses of function HRM (hypothetical repatriation method).
+
+```{r}
+## Path
+PathTest <- getwd() # "C:/Users/SJOITL/Desktop/temporaire/test/"
+PathTemp <- getwd() # "C:/Users/SJOITL/Desktop/temporaire/"
+
+
+# Loading a MRIO in long format
+DT <- readRDS(paste0(PathTest, "BDn_FIG_2010.rds"))
+
+# Example : build an adjusted MRIO with 10% of automotive industry back in France instead of imported.
+#   you can see the different options of demand component affected (ALL=CIall+DFall) that gives the contributions to "ALL" option.
+Test1_HRM <- av_HRM(DT, "FRA", "C29", 0.10, verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "ALL", OptVariantePaysImp = "ALL", OptBaseIntermAvantRecalcProd = FALSE)
+Test2_HRM <- av_HRM(DT, "FRA", "C29", 0.10, verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "CIall", OptVariantePaysImp = "ALL", OptBaseIntermAvantRecalcProd = FALSE)
+Test3_HRM <- av_HRM(DT, "FRA", "C29", 0.10, verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "CIdom", OptVariantePaysImp = "ALL", OptBaseIntermAvantRecalcProd = FALSE)
+Test4_HRM <- av_HRM(DT, "FRA", "C29", 0.10, verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "DFall", OptVariantePaysImp = "ALL", OptBaseIntermAvantRecalcProd = FALSE)
+Test5_HRM <- av_HRM(DT, "FRA", "C29", 0.10, verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "DFdom", OptVariantePaysImp = "ALL", OptBaseIntermAvantRecalcProd = FALSE)
+Test6_HRM <- av_HRM(DT, "FRA", "C29", 0.10, verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "DFdom", OptVariantePaysImp = "horsUE", OptBaseIntermAvantRecalcProd = FALSE)
+Test7_HRM <- av_HRM(DT, "FRA", "C29", 0.10, verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "DFdom", OptVariantePaysImp = "CHN", OptBaseIntermAvantRecalcProd = FALSE)
+Test8_HRM <- av_HRM(DT, "FRA", "C29", 0.10, verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "DFdom", OptVariantePaysImp = "USA", OptBaseIntermAvantRecalcProd = TRUE)
+
+# Here is an exemple of calibration function use (what % corresponds to 100M of the given industry ?)
+Test_Attrib1 <- Attr_TxSimu_HRM_100MoE("A01", "FRA", 2010, TypeTx = "PROD", OptSourceRDS = "XXXXX", OptMRIOlong = DT)
+Test_Attrib2 <- Attr_TxSimu_HRM_100MoE("A01", "FRA", 2010, TypeTx = "VA", OptSourceRDS = "XXXXX", OptMRIOlong = DT)
+
+# You can also build a database with the calibration to avoid memory time consuming
+## Code to build a database for PROD that can be saved in .RDS and used again and again for massive use (better time)
+Prod_FIG <- DT[Col_Country == "PROD", ]
+Prod_FIG$TxSimuHRM_100MoE <- 1 / Prod_FIG$value * 100 # pour 100M€
+Prod_FIG <- GereInfNA(Prod_FIG)
+saveRDS(Prod_FIG, paste0(PathTemp, "Base_REF_ProductionFIG.rds"))
+## Code to build a database for VA that can be saved in .RDS and used again and again for massive use (better time)
+VA_tx <- CompoMRIO(DT, typeCompo = "VA", date = DT[1, "year"]$year, OptTab = FALSE, OptUE27 = FALSE)
+VA_tx$TxSimuHRM_100MoE <- 1 / VA_tx$value * 100 # for 100M€
+VA_tx <- GereInfNA(VA_tx)
+saveRDS(VA_tx, paste0(PathTemp, "Base_REF_VAFIG.rds"))
+
+# Using the calibration database / error message if incomplete imput data
+CheminProd <- paste0(PathTemp, "Base_REF_ProductionFIG.rds")
+CheminVA <- paste0(PathTemp, "Base_REF_VAFIG.rds")
+Test_Attrib3 <- Attr_TxSimu_HRM_100MoE("A01", "FRA", 2010, TypeTx = "PROD", OptSourceRDS = CheminProd, OptMRIOlong = NULL)
+Test_Attrib4 <- Attr_TxSimu_HRM_100MoE("A01", "FRA", 2010, TypeTx = "VA", OptSourceRDS = CheminVA, OptMRIOlong = NULL)
+Test_Attrib5 <- Attr_TxSimu_HRM_100MoE("A01", "FRA", 2010, TypeTx = "PROD", OptSourceRDS = "XXXXX", OptMRIOlong = NULL) # ERROR is OK : looking for
+Test_Attrib6 <- Attr_TxSimu_HRM_100MoE("A01", "FRA", 2010, TypeTx = "VA", OptSourceRDS = "XXXXX", OptMRIOlong = NULL) # ERROR is OK : looking for
+```
+
+
+
+#2. Calculation of intermediate tables (and save long and wide MRIO formats) with HRM function by looping over all industries.
+
+Calculation for 100M€ of Value Added (VA) --> need *10 afterward to reach 1Md€ VA
+
+Be careful : need 20Go of memory to save
+
+```{r}
+library(tictoc)
+# Loading the reference database  :  Figaro 2019
+BASE_FIG2019 <- readRDS(paste0(PathTest, "BDn_FIG_2019.rds"))
+
+
+# Build components of this MRIO and save the long and wide format
+MRIO_REF <- CompoMRIO(SommeDFenP3_S14(BASE_FIG2019), typeCompo = "OptFullOptionsBonus", date = 2019)
+MRIO2REF <- av_extend_MRIO_dw(MRIO_dw = MRIO_REF, "FIGARO", TypExtension = "StressVA")
+MRIO3REF <- av_extend_MRIO_dw(MRIO_dw = MRIO2REF, "FIGARO", TypExtension = "StressEmi", Path1 = PathTemp)
+saveRDS(BASE_FIG2019, paste0(PathTest, "HRMlong_REF_FIG2019_100MoE.rds"))
+saveRDS(MRIO3REF, paste0(PathTest, "HRMwide_REF_FIG2019_100MoE.rds"))
+
+
+# Looping over all 64 industries to calculate and save HRM
+List_A64 <- unique(BASE_FIG2019[, "Lig_Indus"])
+List_A64 <- unlist(List_A64$Lig_Indus)
+
+NumProdA64 <- 1:63 # 1:63
+
+tic()
+
+for (k in NumProdA64) {
+  IndusREF <- List_A64[[k]]
+
+  Pct_Attrib_IndusREF <- Attr_TxSimu_HRM_100MoE(IndusREF, "FRA", 2019, TypeTx = "VA", OptSourceRDS = "XXXXX", OptMRIOlong = BASE_FIG2019)
+
+  interm <- av_HRM(BASE_FIG2019, "FRA", IndusREF, Pct_Attrib_IndusREF, verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "ALL", OptVariantePaysImp = "ALL", OptBaseIntermAvantRecalcProd = FALSE)
+
+  base_long_interm <- interm[["HRM_Base"]]
+  base_wide_interm <- CompoMRIO(SommeDFenP3_S14(base_long_interm), typeCompo = "OptFullOptionsBonus", date = 2019)
+  MRIO2_interm <- av_extend_MRIO_dw(MRIO_dw = base_wide_interm, "FIGARO", TypExtension = "StressVA")
+  MRIO3_interm <- av_extend_MRIO_dw(MRIO_dw = MRIO2_interm, "FIGARO", TypExtension = "StressEmi", Path1 = PathTemp)
+  MRIO3_interm[["EmiOverOuput"]] <- MRIO3REF[["EmiOverOuput"]] # Be careful : we need to keep initial Emi / Ouptut because Ouput is recalculated by HRM and emissions does not fit this new output but initial one.
+  saveRDS(base_long_interm, paste0(paste0(PathTest, "HRMlong_", IndusREF, "_100MoE.rds")))
+  saveRDS(MRIO3_interm, paste0(PathTest, "HRMwide_", IndusREF, "_100MoE.rds"))
+
+  print(paste0("SimuHRM_FRA_", IndusREF, "_100MoE.rds       SAVED"))
+}
+
+toc()
+```
+
+Calculation of ratio Employment / VA  at basic price on 2019 Eurostat data
+```{r}
+BaseSIOTFRA <- fread(paste0(PathTest, "naio_10_cp1700.tsv")) # search "naio_10_cp1700" on Eurostat website
+BaseEmploi <- fread(paste0(PathTest, "nama_10_a64_e.tsv")) # Employment data in National Accounts data of eurostat website
+
+BaseSIOTFRA_split <- BaseSIOTFRA %>%
+  separate(V1, c("unit", "stk_flow", "induse", "prod_na", "geo\time"), ",")
+colnames(BaseSIOTFRA_split) <- BaseSIOTFRA_split[1, ]
+BaseSIOTFRA_split <- BaseSIOTFRA_split[-1, ]
+setnames(BaseSIOTFRA_split, "geo\\time", "geo")
+BaseSIOTFRA_split <- setDT(BaseSIOTFRA_split)
+
+BaseEmploi_split <- BaseEmploi %>%
+  separate(V1, c("unit", "nace_r2", "na_item", "geo\time"), ",")
+colnames(BaseEmploi_split) <- BaseEmploi_split[1, ]
+BaseEmploi_split <- BaseEmploi_split[-1, ]
+setnames(BaseEmploi_split, "geo\\time", "geo")
+BaseEmploi_split <- setDT(BaseEmploi_split)
+
+annee <- 2019
+
+# Sélections
+TES_w <- BaseSIOTFRA_split[geo == "FR" & unit == "MIO_EUR" & stk_flow == "DOM", c("unit", "stk_flow", "induse", "prod_na", "geo", "2019")] # only domestic part
+print(unique(TES_w[, "prod_na"]))
+setnames(TES_w, "2019", "OBS_VALUE")
+TES_w <- TES_w[, OBS_VALUE := as.numeric(OBS_VALUE)]
+
+# Import de la table de référence des codes (et qui est aussi une table de passage)
+REFcodesA64 <- read_excel("StructDocs et Tab_Pass_reindus.xlsx", sheet = "ESTAT INDUSTRY", col_names = TRUE)
+REFcodesA64 <- setDT(REFcodesA64)
+REFcodesOPdemandFin <- read_excel("StructDocs et Tab_Pass_reindus.xlsx", sheet = "ESTAT OP", col_names = TRUE)
+REFcodesOPdemandFin <- setDT(REFcodesOPdemandFin)
+
+# Select SIOT components
+
+# setnames(REFcodesA64, "INDUSTRY", "prod_na")
+VA_w <- TES_w[prod_na == "B1G", ]
+print(sum(VA_w$OBS_VALUE)) # Attention il y a le total
+VA_w2 <- REFcodesA64[VA_w, on = .(INDUSTRY = induse), nomatch = 0]
+VA_w3 <- VA_w2[, sum(OBS_VALUE), by = .(INDUSTRY_AGG)]
+print(sum(VA_w3$V1))
+VA_w <- VA_w3
+
+# Adapt to employment classifications
+REFcodesA64emp <- read_excel(paste0(PathTest, "NomencSIOT.xlsx", sheet = "INDUSTRY_EMP", col_names = TRUE))
+REFcodesA64emp <- setDT(REFcodesA64emp)
+
+# Sélections
+EMP_w <- BaseEmploi_split[geo == "FR" & unit == "THS_PER" & na_item == "EMP_DC", c("unit", "nace_r2", "na_item", "geo", "2019")]
+setnames(EMP_w, "2019", "OBS_VALUE")
+EMP_w <- EMP_w[, OBS_VALUE := as.numeric(OBS_VALUE)]
+EMP_w$nace_r2 <- paste0("CPA_", EMP_w$nace_r2)
+
+# Presentation
+EMP_w2 <- REFcodesA64emp[EMP_w, on = .(INDUSTRY = nace_r2)]
+EMP_w3 <- EMP_w2[, sum(OBS_VALUE), by = .(INDUSTRY_AGG)]
+EMP_w3 <- EMP_w3[-1, ]
+EMP_w <- EMP_w3
+EMP_DF <- setDF(EMP_w)
+EMP_DF <- GetRownamesFromFirstCol(EMP_DF)
+colnames(EMP_DF)[1] <- "EMPLOI"
+print(sum(EMP_DF$EMPLOI))
+
+# Calculation of employment/VA ratio
+ratioEmploiVA <- vectDF(EMP_DF$EMPLOI / VA_w$V1)
+rownames(ratioEmploiVA) <- rownames(EMP_DF)
+ratioEmploiVA <- AddRownamesToFirstCol(ratioEmploiVA)
+ratioEmploiVA$Lig_Indus <- substr(ratioEmploiVA$joint, 5, length(ratioEmploiVA$joint))
+
+saveRDS(ratioEmploiVA, paste0(PathTest, "ratioEmploiVA_2019.rds"))
+
+
+toto <- saveRDS("ratioEmploiVA_2019.rds")
+```
+
+
+**2bis. Calculation of variant indicators.**
+
+```{r}
+MRIO <- readRDS(paste0(PathTest, "HRMwide_REF_FIG2019_100MoE.rds"))
+
+# Looping over all 64 industries to build indicators database
+List_A64 <- unique(BASE_FIG2019[, "Lig_Indus"])
+List_A64 <- unlist(List_A64$Lig_Indus)
+
+NumProdA64 <- 1:63 # 1:63
+
+tic()
+
+for (k in NumProdA64) {
+  IndusREF <- List_A64[[k]]
+  RatioEmploiVA <- readRDS(paste0(PathTest, "ratioEmploiVA_2019.rds"))
+  MRIObis <- readRDS(paste0(PathTest, "HRMwide_", IndusREF, "_100MoE.rds"))
+  Indic_interm <- IndicVariant_IndusCountry(IndusREF, CountryREF = "FRA", ListCountryREF = c("FRA", "DEU", "GBR", "ESP", "ITA"), MRIO, MRIObis, RatioEmploiVA)
+  Indic_interm <- Indic_interm[, Variant := IndusREF]
+
+  if (k == 1) {
+    Base_Indic_HRM <- Indic_interm
+  } else {
+    Base_Indic_HRM <- rbind(Base_Indic_HRM, Indic_interm)
+  }
+
+  print(paste0("Indicator for ", IndusREF, " OK"))
+}
+
+toc()
+
+saveRDS(Base_Indic_HRM, paste0(PathTest, "Base_Indic_HRM_100MoE.rds"))
+```
+
+**2ter. Build results database at A64 level (indicators+raw data and all that is needed).**
+Add new indicators to the previous database.
+
+```{r}
+BASE_FIG2019 <- readRDS(paste0(PathTest, "BDn_FIG_2019.rds"))
+MRIO <- readRDS(paste0(PathTest, "HRMwide_REF_FIG2019_100MoE.rds"))
+indics <- readRDS(paste0(PathTest, "Base_Indic_HRM_100MoE.rds"))
+
+VA_orig <- MRIO[["VA"]][Col_Country == "FRA", ]
+print(sum(VA_orig$value))
+
+PROD_orig <- MRIO[["PROD"]]
+
+RatioEmploiVA <- readRDS(paste0(PathTest, "ratioEmploiVA_2019.rds"))
+Emploi_orig <- VA_orig # init
+Emploi_orig$value <- RatioEmploiVA$vect * VA_orig$value
+print(sum(Emploi_orig$value, na.rm = T))
+
+Emi_orig <- MRIO[["VA"]] # init
+Emi_orig$value <- as.data.frame(Mult2_rcpp3(MRIO[["EmiOverOuput"]], as.matrix(MRIO[["PROD"]]$value)), drop = FALSE)
+Emi_orig <- setDT(Emi_orig)
+Emi_orig <- Emi_orig[Col_Country == "FRA", ]
+
+# Looping over all 64 industries to calculate direct et indirect effects on VA, Output
+List_A64 <- unique(BASE_FIG2019[, "Lig_Indus"])
+List_A64 <- unlist(List_A64$Lig_Indus)
+
+NumProdA64 <- 1:63 # 1:63
+
+for (k in NumProdA64) {
+  IndusREF <- List_A64[[k]]
+  RatioEmploiVA <- readRDS(paste0(PathTest, "ratioEmploiVA_2019.rds"))
+  MRIObis <- readRDS(paste0(PathTest, "HRMwide_", IndusREF, "_100MoE.rds"))
+
+  Prod_direct <- MRIObis[["PROD"]][Lig_Country == "FRA" & Lig_Indus == IndusREF, sum(value)] - MRIO[["PROD"]][Lig_Country == "FRA" & Lig_Indus == IndusREF, sum(value)]
+  Prod_indirect <- MRIObis[["PROD"]][Lig_Country == "FRA" & Lig_Indus != IndusREF, sum(value)] - MRIO[["PROD"]][Lig_Country == "FRA" & Lig_Indus != IndusREF, sum(value)]
+  Prod_tot <- MRIObis[["PROD"]][Lig_Country == "FRA", sum(value)] - MRIO[["PROD"]][Lig_Country == "FRA", sum(value)]
+  VA_direct <- MRIObis[["VA"]][Col_Country == "FRA" & Col_Indus == IndusREF, sum(value)] - MRIO[["VA"]][Col_Country == "FRA" & Col_Indus == IndusREF, sum(value)]
+  VA_indirect <- MRIObis[["VA"]][Col_Country == "FRA" & Col_Indus != IndusREF, sum(value)] - MRIO[["VA"]][Col_Country == "FRA" & Col_Indus != IndusREF, sum(value)]
+  VA_tot <- MRIObis[["VA"]][Col_Country == "FRA", sum(value)] - MRIO[["VA"]][Col_Country == "FRA", sum(value)]
+
+  DirIndir_interm <- data.table(
+    Lig_Country = c("FRA", "FRA", "FRA", "FRA", "FRA", "FRA"),
+    variant = rep(IndusREF, 5),
+    TypeRes = c("Prod_direct", "Prod_indirect", "Prod_tot", "VA_direct", "VA_indirect", "VA_tot"),
+    value = c(Prod_direct, Prod_indirect, Prod_tot, VA_direct, VA_indirect, VA_tot)
+  )
+
+  if (k == 1) {
+    Base_DirIndir <- DirIndir_interm
+  } else {
+    Base_DirIndir <- rbind(Base_DirIndir, DirIndir_interm)
+  }
+
+  print(paste0("Indicator for ", IndusREF, " : ", k, " / 63"))
+}
+saveRDS(Base_DirIndir, paste0(PathTest, "Base_IndicCompl_HRM_100MoE.rds"))
+
+
+### Merge tables
+Base_DirIndir <- readRDS(paste0(PathTest, "Base_IndicCompl_HRM_100MoE.rds"))
+setnames(Base_DirIndir, "variant", "Variant")
+dl_indics <- rbind(indics, Base_DirIndir)
+
+dl_indics_tab <- dcast(dl_indics[Lig_Country == "FRA"], Variant ~ TypeRes, value.var = "value")
+dl_indics_tab <- dl_indics_tab[, Prod_Orig := PROD_orig[Lig_Country == "FRA", ][1:63, ]$value]
+dl_indics_tab <- dl_indics_tab[, VA_Orig := VA_orig[Col_Country == "FRA", ][1:63, ]$value]
+dl_indics_tab <- dl_indics_tab[, Emploi_Orig := Emploi_orig[Col_Country == "FRA", ][1:63, ]$value]
+dl_indics_tab <- dl_indics_tab[, Emi_Orig := Emi_orig[Col_Country == "FRA", ][1:63, ]$value]
+
+Indics_A64toAgregate <- melt(dl_indics_tab, id.vars = c("Variant"))
+
+saveRDS(Indics_A64toAgregate, paste0(PathTest, "Indics_A64toAgregate.rds"))
+```
+
+Agregattion of MADE IN split in numerator/denominator based on A64 made-in calculations
+--> better solution than only agregate A64 made-ins with wheight (value added)
+```{r}
+BASE_FIG2019 <- readRDS(paste0(PathTest, "BDn_FIG_2019.rds"))
+MRIO <- readRDS(paste0(PathTest, "HRMwide_REF_FIG2019_100MoE.rds"))
+
+MadeIn_MRIO <- av_MadeIn(MRIO, Optdl = FALSE, 2019, OptDonneesBrutes = TRUE)
+base_res <- MadeIn_MRIO[["baseNumdenom"]][, variante := "REF"] # Init
+
+# Looping over all 64 industries to calculate made-in in level
+List_A64 <- unique(BASE_FIG2019[, "Lig_Indus"])
+List_A64 <- unlist(List_A64$Lig_Indus)
+
+NumProdA64 <- 1:63 # 1:63
+
+for (k in NumProdA64) {
+  IndusREF <- List_A64[[k]]
+  MRIObis <- readRDS(paste0(PathTest, "HRMwide_", IndusREF, "_100MoE.rds"))
+
+  MadeIn_MRIObis <- av_MadeIn(MRIObis, Optdl = FALSE, 2019, OptDonneesBrutes = TRUE)
+
+  res_variante <- MadeIn_MRIObis[["baseNumdenom"]][, variante := IndusREF]
+
+  base_res <- rbind(base_res, res_variante)
+  print(paste0(k, " / 63"))
+}
+
+saveRDS(base_res, paste0("MadeIn_HRM_NumDenum_A64.rds"))
+
+
+# Calculation
+Base_HRM_MadeIn <- readRDS("MadeIn_HRM_NumDenum_A64.rds")
+numdenum_agg <- Base_HRM_MadeIn[, sum(value), by = c("Col_Country", "position", "variante")]
+numdenum_agg <- numdenum_agg[Col_Country == "FRA", ][, Col_Country := NULL]
+numdenum_agg_tab <- dcast(numdenum_agg, variante ~ position, value.var = "V1")
+numdenum_agg_tab$ratiomadeIn <- numdenum_agg_tab$numerateur / numdenum_agg_tab$denominateur
+numdenum_agg_tab <- setDT(numdenum_agg_tab)
+numdenum_agg_tab$DiffratiomadeIn <- numdenum_agg_tab$ratiomadeIn - numdenum_agg_tab[variante == "REF", "ratiomadeIn"]$ratiomadeIn # 0.7788367 = difference with reference   REF :  numerator = 5331182  et denominator = 6845058
+numdenum_agg_tab <- numdenum_agg_tab[variante != "REF", ] # Drop reference sector
+
+numdenum_agg <- numdenum_agg[variante != "REF", ] # Drop reference sector
+
+setnames(numdenum_agg, c("variante", "position", "V1"), c("Variant", "variable", "value"))
+
+saveRDS(numdenum_agg, paste0("MadeIn_HRM_NumDenum_Agg.rds"))
+saveRDS(numdenum_agg_tab, paste0("MadeIn_HRM_NumDenum_Agg_tab.rds"))
+```
+
+
+
+#3. Calculation of Manuf agregates and other macro sectors.
+
+Method : Keep all details and build agregate afterward by reweighting the various branches by their value added. This method is better than only agregate and calculate in a second time because it preserves all the interactions between branches, especially intra-branch interactions. In addition, it allows us to document the main detailed branches that contribute to the aggregates.
+
+```{r}
+Indics_A64toAgregate <- readRDS(paste0(PathTest, "Indics_A64toAgregate.rds"))
+MadeIn_numdenum_agg <- readRDS(paste0("MadeIn_HRM_NumDenum_Agg.rds"))
+Indics_A64toAgregate <- rbind(Indics_A64toAgregate, MadeIn_numdenum_agg)
+
+List_NoMult10 <- c("2bis_DiffMadeInNiv_denominateur_Apres", "2bis_DiffMadeInNiv_denominateur_Avant", "2bis_DiffMadeInNiv_numerateur_Apres", "2bis_DiffMadeInNiv_numerateur_Avant", "Prod_Orig", "VA_Orig", "Emploi_Orig", "Emi_Orig", "numerateur", "denominateur")
+Indics_A64toAgregate <- Indics_A64toAgregate[!(variable %in% List_NoMult10), value := 10 * value] # Here *10 to be in 1Md€ and not in 100M€
+
+Indics_A64toAgregate_tab <- dcast(Indics_A64toAgregate, Variant ~ variable, value.var = "value")
+List_VarToAgregate <- unique(Indics_A64toAgregate[, "variable"])
+print(List_VarToAgregate)
+
+### Load classifications tables
+TabPassIND <- read_excel("StructDocs et Tab_Pass_Reindus.xlsx", sheet = "TabPass_PR", col_names = TRUE)
+TabPassGEO <- read_excel("StructDocs et Tab_Pass_Reindus.xlsx", sheet = "TabPass_GEO", col_names = TRUE)
+
+### Selection of the right classifications data for aggregation
+TabPassIND_select <- unique(TabPassIND[, c("A10", "A17", "A38", "Figaro64ind", "Manuf_CT", "Manuf_IP19", "TabIA_1", "TabIA_2")])
+TabPassIND_select <- TabPassIND_select[1:64, ]
+TabPassIND_select <- setDT(TabPassIND_select)
+TabPassIND_select <- TabPassIND_select[, TOTAL := "TOTAL"] # Add a summation 'total' item
+
+# Merge Indics table with classifications table
+IndicsPlusAggClassif <- TabPassIND_select[Indics_A64toAgregate, on = .(Figaro64ind = Variant)]
+
+Val_VA <- IndicsPlusAggClassif[variable == "VA_Orig", c("Figaro64ind", "value")]
+Val_PROD <- IndicsPlusAggClassif[variable == "Prod_Orig", c("Figaro64ind", "value")]
+
+IndicsPlusAggClassif2 <- Val_PROD[IndicsPlusAggClassif, on = .(Figaro64ind = Figaro64ind)]
+setnames(IndicsPlusAggClassif2, c("value", "i.value"), c("Pond_PROD", "value"))
+
+IndicsPlusAggClassif3 <- Val_VA[IndicsPlusAggClassif2, on = .(Figaro64ind = Figaro64ind)]
+setnames(IndicsPlusAggClassif3, c("value", "i.value"), c("Pond_VA", "value"))
+
+BaseIndics_ToAggregate <- IndicsPlusAggClassif3
+
+### 2 types of agregations are computed :
+# 1 / Summation only
+List_Sum <- c("2bis_DiffMadeInNiv_denominateur_Apres", "2bis_DiffMadeInNiv_denominateur_Avant", "2bis_DiffMadeInNiv_numerateur_Apres", "2bis_DiffMadeInNiv_numerateur_Avant", "Prod_Orig", "VA_Orig", "Emploi_Orig", "Emi_Orig", "numerateur", "denominateur")
+# 2 / weighted.mean with value added (VA)
+List_VA <- c("Prod_direct", "Prod_indirect", "Prod_tot", "VA_direct", "VA_indirect", "VA_tot", "1_DiffProdVANiv", "2_DiffMadeInPct", "5_DiffAggFootprintCO2Pct", "9_DiffSoldExtPct", "3_DiffEmploisNiv", "3bis_DiffEmploisDirectNiv", "4_DiffAggFootprintCO2Niv", "6_DiffEmiProd", "6bis_DiffEmiProdDirect", "7_DiffEmiWorld", "8_DiffSoldExtNiv")
+
+# Agreggations
+fun_agreg <- function(NivAgreg) {
+  DT_1 <- BaseIndics_ToAggregate[variable %in% List_Sum, sum(value, na.rm = T), by = c("variable", NivAgreg)][, nomenc := NivAgreg]
+  DT_2 <- BaseIndics_ToAggregate[variable %in% List_VA, weighted.mean(value, w = Pond_VA), by = c("variable", NivAgreg)][, nomenc := NivAgreg]
+  DT_out <- rbind(DT_1, DT_2)
+  setnames(DT_out, NivAgreg, "IndusSimuHRM")
+  return(DT_out)
+}
+
+DT_TOT <- fun_agreg("TOTAL")
+DT_A10 <- fun_agreg("A10")
+DT_A17 <- fun_agreg("A17")
+DT_A38 <- fun_agreg("A38")
+DT_ManufCT <- fun_agreg("Manuf_CT")
+DT_ManufIP19 <- fun_agreg("Manuf_IP19")
+DT_Agg1 <- fun_agreg("TabIA_1")
+DT_Agg2 <- fun_agreg("TabIA_2")
+
+DT_Agreg <- rbind(DT_TOT, DT_ManufCT, DT_ManufIP19, DT_A10, DT_A17, DT_A38, DT_Agg1, DT_Agg2)
+setnames(DT_Agreg, "V1", "value")
+DT_interm <- BaseIndics_ToAggregate[, c("variable", "Figaro64ind", "value")][, nomenc := "A64"]
+setnames(DT_interm, "Figaro64ind", "IndusSimuHRM")
+
+DT_Full <- rbind(DT_Agreg, DT_interm)
+
+DT_Full_tab <- dcast(DT_Full, nomenc + IndusSimuHRM ~ variable, value.var = "value")
+
+VA_march <- DT_Full_tab[IndusSimuHRM == "TOTAL", "VA_Orig"]$VA_Orig - DT_Full_tab[IndusSimuHRM == "OQ", "VA_Orig"]$VA_Orig
+DT_Full_tab$VA_CommSect <- DT_Full_tab$VA_Orig / VA_march
+DT_Full <- melt(DT_Full_tab, id.vars = c("nomenc", "IndusSimuHRM"))
+
+DT_Full <- DT_Full[IndusSimuHRM != "ToDROP"]
+DT_Full_tab <- DT_Full_tab[IndusSimuHRM != "ToDROP"]
+
+saveRDS(DT_Full, paste0("Results_HRM_long.rds"))
+saveRDS(DT_Full_tab, paste0("Results_HRM_tab.rds"))
+
+library(xlsx)
+write.xlsx(DT_Full, paste0("Results_HRM", ".xlsx"), sheetName = "long", col.names = TRUE, row.names = TRUE)
+write.xlsx(DT_Full_tab, paste0("Results_HRM", ".xlsx"), sheetName = "tab", col.names = TRUE, row.names = TRUE, append = TRUE)
+```
+
+Working paper tables
+
+```{r}
+HRM_res <- readRDS("Results_HRM_tab.rds")
+HRM_res <- setDT(HRM_res)
+setnames(HRM_res, c("1_DiffProdVANiv", "3_DiffEmploisNiv", "3bis_DiffEmploisDirectNiv", "7_DiffEmiWorld", "6_DiffEmiProd", "4_DiffAggFootprintCO2Niv"), c("A1_DiffProdVANiv", "A3_DiffEmploisNiv", "A3bis_DiffEmploisDirectNiv", "A7_DiffEmiWorld", "A6_DiffEmiProd", "A4_DiffAggFootprintCO2Niv"))
+NomencTabIA <- read_excel("StructDocs et Tab_Pass_Reindus.xlsx", sheet = "TabIA", col_names = TRUE)
+NomencTabIA <- setDT(NomencTabIA)
+
+WhatRound <- 1
+
+# Tab1
+HRM_res$t1_1_partVA <- round(HRM_res$VA_CommSect * 100, WhatRound)
+HRM_res <- HRM_res[, t1_2_EffetVA := round(A1_DiffProdVANiv / 1000, WhatRound)]
+HRM_res$t1_3_EffetProdTot <- round(HRM_res$Prod_tot / 1000, WhatRound)
+HRM_res$t1_4_EffetProdDir <- round(HRM_res$Prod_Orig / HRM_res$VA_Orig, WhatRound)
+HRM_res$t1_5_EffetProdInd <- round(HRM_res$t1_3_EffetProdTot - HRM_res$t1_4_EffetProdDir, WhatRound)
+HRM_res$t1_6_EffetProdMult <- round(HRM_res$t1_3_EffetProdTot / HRM_res$t1_4_EffetProdDir, WhatRound)
+HRM_res$t1_7_MadeIn <- round((HRM_res$numerateur / HRM_res$denominateur - 0.7788367) * 1000 * 100, WhatRound)
+List_t1 <- c("Code", "Lib", "t1_1_partVA", "t1_2_EffetVA", "t1_3_EffetProdTot", "t1_4_EffetProdDir", "t1_5_EffetProdInd", "t1_6_EffetProdMult", "t1_7_MadeIn")
+
+# Tab2
+HRM_res$t2_1_partVA <- round(HRM_res$VA_CommSect * 100, WhatRound)
+HRM_res <- HRM_res[, t2_2_EffetEmploiTot := round(A3_DiffEmploisNiv, WhatRound)]
+HRM_res$t2_3_EffetEmploiDir <- round(HRM_res$Emploi_Orig / HRM_res$VA_Orig * 1000, WhatRound)
+HRM_res$t2_4_EffetEmploiInd <- round(HRM_res$t2_2_EffetEmploiTot - HRM_res$t2_3_EffetEmploiDir, WhatRound)
+HRM_res <- HRM_res[, t2_6_EffetEmploiIndIndAutres := round((A3_DiffEmploisNiv - A3bis_DiffEmploisDirectNiv), WhatRound)]
+HRM_res$t2_5_EffetEmploiIndIndMeme <- round(HRM_res$t2_4_EffetEmploiInd - HRM_res$t2_6_EffetEmploiIndIndAutres, WhatRound)
+HRM_res$t2_7_EffetEmploiMult <- round(HRM_res$t2_2_EffetEmploiTot / HRM_res$t2_3_EffetEmploiDir, WhatRound)
+List_t2 <- c("Code", "Lib", "t2_1_partVA", "t2_2_EffetEmploiTot", "t2_3_EffetEmploiDir", "t2_4_EffetEmploiInd", "t2_5_EffetEmploiIndIndMeme", "t2_6_EffetEmploiIndIndAutres", "t2_7_EffetEmploiMult")
+
+# Tab3
+HRM_res$t3_1_partVA <- round(HRM_res$VA_CommSect * 100, WhatRound)
+HRM_res <- HRM_res[, t3_2_DiffEmiWorld := round(A7_DiffEmiWorld, 0)]
+HRM_res <- HRM_res[, t3_3_DiffEmiProdFRA := round(A6_DiffEmiProd, 0)]
+HRM_res$t3_4_DiffEmiProdFRAdir <- round(HRM_res$Emi_Orig / HRM_res$VA_Orig * 1000, 0)
+HRM_res$t3_5_DiffEmiProdFRAind <- round(HRM_res$t3_3_DiffEmiProdFRA - HRM_res$t3_4_DiffEmiProdFRAdir, 0)
+HRM_res$t3_6_DiffEmiProdFRAmult <- round(HRM_res$t3_3_DiffEmiProdFRA / HRM_res$t3_4_DiffEmiProdFRAdir, WhatRound)
+HRM_res$t3_7_DiffEmiHorsFRA <- round(HRM_res$t3_2_DiffEmiWorld - HRM_res$t3_3_DiffEmiProdFRA, 0)
+HRM_res <- HRM_res[, t3_8_DiffFootprintCO2FRA := round(A4_DiffAggFootprintCO2Niv, 0)]
+List_t3 <- c("Code", "Lib", "t3_1_partVA", "t3_2_DiffEmiWorld", "t3_3_DiffEmiProdFRA", "t3_4_DiffEmiProdFRAdir", "t3_5_DiffEmiProdFRAind", "t3_6_DiffEmiProdFRAmult", "t3_7_DiffEmiHorsFRA", "t3_8_DiffFootprintCO2FRA")
+
+# Tabs
+HRM_pres <- NomencTabIA[HRM_res, on = .(Code = IndusSimuHRM)]
+HRM_pres <- unique(HRM_pres[!is.na(Lib), ][, nomenc := NULL][order(Ordre)][, Ordre := NULL])
+HRM_pres_t1 <- HRM_pres[, c("Code", "Lib", "t1_1_partVA", "t1_2_EffetVA", "t1_3_EffetProdTot", "t1_4_EffetProdDir", "t1_5_EffetProdInd", "t1_6_EffetProdMult", "t1_7_MadeIn")]
+HRM_pres_t2 <- HRM_pres[, c("Code", "Lib", "t2_1_partVA", "t2_2_EffetEmploiTot", "t2_3_EffetEmploiDir", "t2_4_EffetEmploiInd", "t2_5_EffetEmploiIndIndMeme", "t2_6_EffetEmploiIndIndAutres", "t2_7_EffetEmploiMult")]
+HRM_pres_t3 <- HRM_pres[, c("Code", "Lib", "t3_1_partVA", "t3_2_DiffEmiWorld", "t3_3_DiffEmiProdFRA", "t3_4_DiffEmiProdFRAdir", "t3_5_DiffEmiProdFRAind", "t3_6_DiffEmiProdFRAmult", "t3_7_DiffEmiHorsFRA", "t3_8_DiffFootprintCO2FRA")]
+HRM_pres_compl <- HRM_res[, c("nomenc", "IndusSimuHRM", "t1_1_partVA", "t1_2_EffetVA", "t1_3_EffetProdTot", "t1_4_EffetProdDir", "t1_5_EffetProdInd", "t1_6_EffetProdMult", "t1_7_MadeIn", "t2_2_EffetEmploiTot", "t2_3_EffetEmploiDir", "t2_4_EffetEmploiInd", "t2_5_EffetEmploiIndIndMeme", "t2_6_EffetEmploiIndIndAutres", "t2_7_EffetEmploiMult", "t3_2_DiffEmiWorld", "t3_3_DiffEmiProdFRA", "t3_4_DiffEmiProdFRAdir", "t3_5_DiffEmiProdFRAind", "t3_6_DiffEmiProdFRAmult", "t3_7_DiffEmiHorsFRA", "t3_8_DiffFootprintCO2FRA")]
+
+library(xlsx)
+write.xlsx(HRM_pres_t1, paste0("Tableaux_IA_HRM", ".xlsx"), sheetName = "T1 Eco", col.names = TRUE, row.names = TRUE)
+write.xlsx(HRM_pres_t2, paste0("Tableaux_IA_HRM", ".xlsx"), sheetName = "T2 Empl", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(HRM_pres_t3, paste0("Tableaux_IA_HRM", ".xlsx"), sheetName = "T3 Envir", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(HRM_pres_compl, paste0("Tableaux_IA_HRM", ".xlsx"), sheetName = "Complementaire", col.names = TRUE, row.names = TRUE, append = TRUE)
+```
+
+
+Producing data for emissions and carbon footprint maps
+
+
+```{r}
+BASE_FIG <- readRDS(paste0(PathTest, "BDn_FIG_2019.rds"))
+
+MRIO <- readRDS(paste0(PathTest, "HRMwide_REF_FIG2019_100MoE.rds"))
+
+List_Manuf <- list("C10T12", "C13T15", "C16", "C17", "C18", "C19", "C20", "C21", "C22", "C23", "C24", "C25", "C26", "C27", "C28", "C29", "C30", "C31_32", "C33")
+
+Manuf_FRA <- MRIO[["VA"]][Col_Country == "FRA" & Col_Indus %in% List_Manuf, ]
+Tot_Manuf_FRA <- Manuf_FRA[, sum(value)]
+Struct_Manuf_FRA <- Manuf_FRA[, structVA := value / Tot_Manuf_FRA]
+print(sum(Struct_Manuf_FRA$structVA))
+
+
+# Compîlation of HRM Manuf based on each of 19 industries at level A64
+for (k in 1:19) { # (nrow(Struct_Manuf_FRA)-1)
+  Manuf_Indus <- as.character(Struct_Manuf_FRA[k, "Col_Indus"])
+  Coeff_Manuf_Indus <- as.numeric(Struct_Manuf_FRA[k, "structVA"])
+
+  if (k == 1) {
+    Base_HRMManuf <- readRDS(paste0(PathTest, "HRMlong_", Manuf_Indus, "_100MoE.rds"))
+    Base_HRMManuf$value <- Base_HRMManuf$value * Coeff_Manuf_Indus # From 100M to 1Billion
+    print(k / 19)
+  } else {
+    interm0 <- readRDS(paste0(PathTest, "HRMlong_", Manuf_Indus, "_100MoE.rds"))
+    interm0$value <- interm0$value * Coeff_Manuf_Indus
+    Base_HRMManuf <- rbind(Base_HRMManuf, interm0)
+    Base_HRMManuf <- Base_HRMManuf[, sum(value), by = c("Lig_Country", "Lig_Indus", "year", "Col_Country", "Col_Indus")] # Sum to rebuild the agregate
+    setnames(Base_HRMManuf, "V1", "value")
+    print(k / 19 * 100)
+  }
+}
+gc()
+saveRDS(Base_HRMManuf, "Base_HRMManuf_1MdE.rds")
+
+MRIObis <- CompoMRIO(Base_HRMManuf, typeCompo = "OptFullOptionsBonus", date = 2019)
+MRIO2REF <- av_extend_MRIO_dw(MRIO_dw = MRIObis, "FIGARO", TypExtension = "StressVA")
+MRIO3REF <- av_extend_MRIO_dw(MRIO_dw = MRIO2REF, "FIGARO", TypExtension = "StressEmi", Path1 = PathTemp)
+MRIO3REF[["EmiOverOuput"]] <- MRIO[["EmiOverOuput"]] # Keep old emissions factors
+MRIO_Manuf <- MRIO3REF
+
+saveRDS(MRIO3REF, "MRIO_Manuf_1MdE.rds")
+
+MRIObis <- readRDS("MRIO_Manuf_1MdE.rds")
+
+
+# Calculation of all footprints with MatDF and the global balance
+ContenuMRIOcMatDF <- Contenus(MRIO, typeContenu = "Emi", MethContenu = "MatDF", EmprPays = "FRA")
+ContenuMRIObiscMatDF <- Contenus(MRIObis, typeContenu = "Emi", MethContenu = "MatDF", EmprPays = "FRA")
+
+Conc <- ContenuMRIOcMatDF[["MatEmpreinte_dt"]]
+Conisc <- ContenuMRIObiscMatDF[["MatEmpreinte_dt"]]
+Conc$value <- Conc$value * 10
+Conisc$value <- Conisc$value * 10
+Condiff <- Conc
+Condiff$value <- Conisc$value - Conc$value
+
+# Creation of a table with aggregated production and consumption footprint results
+EmprConso <- Condiff[, sum(value), by = c("Col_Country")]
+
+MRIO <- readRDS(paste0(PathTest, "HRMwide_REF_FIG2019_100MoE.rds"))
+MRIObis <- readRDS("MRIO_Manuf_1MdE.rds")
+
+DiagTot_ContenuMRIOc <- Contenus(MRIO, typeContenu = "Emi", MethContenu = "DiagDFtot", EmprPays = "FRA")
+DiagTot_ContenuMRIObisc <- Contenus(MRIObis, typeContenu = "Emi", MethContenu = "DiagDFtot", EmprPays = "FRA")
+
+DiffEmiProd <- DiagTot_ContenuMRIObisc[["Empreinte_Production"]] # init
+DiffEmiProd$vect <- 10 * (DiagTot_ContenuMRIObisc[["Empreinte_Production"]]$vect - DiagTot_ContenuMRIOc[["Empreinte_Production"]]$vect)
+DiffEmiProd <- AddRownamesToFirstCol(DiffEmiProd)
+DiffEmiProd$Lig_Country <- str_extract(DiffEmiProd$joint, "[^_]+")
+DiffEmiProd$Lig_Indus <- substring(str_extract(DiffEmiProd$joint, "_.+$"), 2)
+DiffEmiProd <- setDT(DiffEmiProd)
+DiffEmiProdTot <- DiffEmiProd[, sum(vect, na.rm = T), by = c("Lig_Country")]
+
+setnames(DiffEmiProdTot, c("Lig_Country", "V1"), c("Col_Country", "DiffEmiProd"))
+setnames(EmprConso, c("V1"), c("DiffEmprConso"))
+
+figCarto <- cbind(DiffEmiProdTot, EmprConso)
+
+saveRDS(figCarto, "PourCartesHRMmanuf.rds")
+
+Emi_world <- readRDS("PourCartesHRMmanuf.rds")
+print(sum(Emi_world$DiffEmiProd))
+print(sum(Emi_world$DiffEmprConso))
+
+write.xlsx(figCarto, "Carto diff Emissions.xlsx", sheetName = "ByCountry", col.names = TRUE, row.names = TRUE)
+```
+
+
+##Emissions footprint map (production and footprint)
+```{r}
+# ### Loading initial and reference data
+# BASE_FIG<-readRDS("Sorties/BDn_FIG.rds")
+# MRIO<-CompoMRIO(BASE_FIG,typeCompo="OptFullOptions",date=2019)
+# Multip<-MRIO[["VA"]]
+# prod<-MRIO[["PROD"]]
+# Multip$ProdSurVA<-prod$value/Multip$value
+# Multip<-Multip[Col_Country=="FRA",]
+
+
+facteurConvVA <- 2.22941004303855 # Conversion factor to go from a shock in prod to a shock in VA on Manuf (cf Excel file)
+# Change the magnitude but not the distribution => same map but just adjust the legend
+
+# Loading data for cards
+DT <- readRDS("PourCartesHRMmanuf.rds")
+DT$DiffEmiProd <- facteurConvVA * DT$DiffEmiProd
+DT$DiffEmprConso <- facteurConvVA * DT$DiffEmprConso
+
+
+library(sf)
+library(rworldmap)
+library(RColorBrewer)
+library(igraph)
+
+
+##################################
+## CO2 Emissions
+DT <- DT[, DiffEmiProd := -DiffEmiProd][, DiffEmprConso := -DiffEmprConso]
+MesDonnesGEO <- setDF(DT[-38, ]) # On enlève ROW
+data(MesDonnesGEO)
+sPDF <- joinCountryData2Map(MesDonnesGEO, joinCode = "ISO3", nameJoinColumn = "Col_Country")
+
+mapCountryData(sPDF,
+  nameColumnToPlot = "DiffEmiProd",
+  oceanCol = "azure2",
+  catMethod = "categorical", # "fixedWidth"
+  missingCountryCol = gray(.8),
+  colourPalette = brewer.pal(15, "RdYlGn"),
+  addLegend = F,
+  mapTitle = "",
+  border = NA,
+  asp = 1
+)
+
+# Zoom UE
+mapCountryData(sPDF,
+  nameColumnToPlot = "DiffEmiProd",
+  oceanCol = "azure2",
+  catMethod = "categorical", # "fixedWidth"
+  missingCountryCol = gray(.8),
+  colourPalette = brewer.pal(15, "RdYlGn"),
+  addLegend = F,
+  mapTitle = "",
+  border = NA,
+  xlim = c(-10, 30), # 59
+  ylim = c(35, 71), # 71
+)
+##################################
+## VA Footprint
+MesDonnesGEO <- setDF(DT[-38, ]) # On enlève ROW
+data(MesDonnesGEO)
+sPDF <- joinCountryData2Map(MesDonnesGEO, joinCode = "ISO3", nameJoinColumn = "Col_Country")
+
+mapCountryData(sPDF,
+  nameColumnToPlot = "DiffEmprConso",
+  oceanCol = "azure2",
+  catMethod = "categorical", # "fixedWidth"
+  missingCountryCol = gray(.8),
+  colourPalette = brewer.pal(15, "YlGn"),
+  addLegend = F,
+  mapTitle = "",
+  border = NA,
+  asp = 1
+)
+
+# Zoom UE
+mapCountryData(sPDF,
+  nameColumnToPlot = "DiffEmprConso",
+  oceanCol = "azure2",
+  catMethod = "categorical", # "fixedWidth"
+  missingCountryCol = gray(.8),
+  colourPalette = brewer.pal(15, "YlGn"),
+  addLegend = F,
+  mapTitle = "",
+  border = NA,
+  xlim = c(-10, 30), # 59
+  ylim = c(35, 71), # 71
+  asp = 1
+)
+
+DT2 <- DT
+DT2$DiffEmiProd <- round(DT2$DiffEmiProd, 3)
+DT2$DiffEmprConso <- round(DT2$DiffEmprConso, 3)
+# DT2<-DT2[order(-DiffEmiProd)]
+DT2 <- DT2[order(-DiffEmprConso)]
+print(sum(DT2$DiffEmiProd)) # ROW is missing
+print(sum(DT2$DiffEmprConso)) # ROW is missing
+```
+
+##Variants for a given product, for instance cars (C29)
+
+```{r}
+# Loading MRIO and create baseline
+
+BASE_FIG <- readRDS(paste0(PathTest, "BDn_FIG_2019.rds"))
+BASE_FIG <- SommeDFenP3_S14(BASE_FIG[year == 2019, ])
+MRIO <- CompoMRIO(BASE_FIG, typeCompo = "OptFullOptionsBonus", date = 2019)
+interm9 <- av_HRM(BASE_FIG[year == 2019, ], "FRA", "C29", Attr_TxSimu_HRM_100MoE("C29", "FRA", 2019, TypeTx = "VA", OptSourceRDS = "XXXXX", OptMRIOlong = BASE_FIG[year == 2019, ]), verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "ALL", OptVariantePaysImp = "ALL", OptBaseIntermAvantRecalcProd = FALSE)
+
+MRIObis <- CompoMRIO(interm9[["HRM_Base"]], typeCompo = "OptFullOptionsBonus", date = 2019)
+gc()
+
+### Variants
+
+interm11 <- av_HRM(BASE_FIG[year == 2019, ], "FRA", "C29", Attr_TxSimu_HRM_100MoE("C29", "FRA", 2019, TypeTx = "VA", OptSourceRDS = "XXXXX", OptMRIOlong = BASE_FIG[year == 2019, ]), verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "CIdom", OptVariantePaysImp = "ALL", OptBaseIntermAvantRecalcProd = FALSE)
+MRIO_CIdom <- CompoMRIO(interm11[["HRM_Base"]], typeCompo = "OptFullOptionsBonus", date = 2019)
+
+interm12 <- av_HRM(BASE_FIG[year == 2019, ], "FRA", "C29", Attr_TxSimu_HRM_100MoE("C29", "FRA", 2019, TypeTx = "VA", OptSourceRDS = "XXXXX", OptMRIOlong = BASE_FIG[year == 2019, ]), verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "CIall", OptVariantePaysImp = "ALL", OptBaseIntermAvantRecalcProd = FALSE)
+MRIO_CIall <- CompoMRIO(interm12[["HRM_Base"]], typeCompo = "OptFullOptionsBonus", date = 2019)
+
+interm13 <- av_HRM(BASE_FIG[year == 2019, ], "FRA", "C29", Attr_TxSimu_HRM_100MoE("C29", "FRA", 2019, TypeTx = "VA", OptSourceRDS = "XXXXX", OptMRIOlong = BASE_FIG[year == 2019, ]), verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "DFdom", OptVariantePaysImp = "ALL", OptBaseIntermAvantRecalcProd = FALSE)
+MRIO_DFdom <- CompoMRIO(interm13[["HRM_Base"]], typeCompo = "OptFullOptionsBonus", date = 2019)
+gc()
+
+interm14 <- av_HRM(BASE_FIG[year == 2019, ], "FRA", "C29", Attr_TxSimu_HRM_100MoE("C29", "FRA", 2019, TypeTx = "VA", OptSourceRDS = "XXXXX", OptMRIOlong = BASE_FIG[year == 2019, ]), verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "DFall", OptVariantePaysImp = "ALL", OptBaseIntermAvantRecalcProd = FALSE)
+MRIO_DFall <- CompoMRIO(interm14[["HRM_Base"]], typeCompo = "OptFullOptionsBonus", date = 2019)
+
+interm21 <- av_HRM(BASE_FIG[year == 2019, ], "FRA", "C29", Attr_TxSimu_HRM_100MoE("C29", "FRA", 2019, TypeTx = "VA", OptSourceRDS = "XXXXX", OptMRIOlong = BASE_FIG[year == 2019, ]), verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "ALL", OptVariantePaysImp = "ESP", OptBaseIntermAvantRecalcProd = FALSE)
+MRIO_ESP <- CompoMRIO(interm21[["HRM_Base"]], typeCompo = "OptFullOptionsBonus", date = 2019)
+
+interm21bis <- av_HRM(BASE_FIG[year == 2019, ], "FRA", "C29", Attr_TxSimu_HRM_100MoE("C29", "FRA", 2019, TypeTx = "VA", OptSourceRDS = "XXXXX", OptMRIOlong = BASE_FIG[year == 2019, ]), verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "ALL", OptVariantePaysImp = "CHN", OptBaseIntermAvantRecalcProd = FALSE)
+MRIO_CHN <- CompoMRIO(interm21bis[["HRM_Base"]], typeCompo = "OptFullOptionsBonus", date = 2019)
+
+interm21ter <- av_HRM(BASE_FIG[year == 2019, ], "FRA", "C29", Attr_TxSimu_HRM_100MoE("C29", "FRA", 2019, TypeTx = "VA", OptSourceRDS = "XXXXX", OptMRIOlong = BASE_FIG[year == 2019, ]), verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "ALL", OptVariantePaysImp = "DEU", OptBaseIntermAvantRecalcProd = FALSE)
+MRIO_DEU <- CompoMRIO(interm21ter[["HRM_Base"]], typeCompo = "OptFullOptionsBonus", date = 2019)
+
+interm22 <- av_HRM(BASE_FIG[year == 2019, ], "FRA", "C29", Attr_TxSimu_HRM_100MoE("C29", "FRA", 2019, TypeTx = "VA", OptSourceRDS = "XXXXX", OptMRIOlong = BASE_FIG[year == 2019, ]), verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "ALL", OptVariantePaysImp = "horsUE", OptBaseIntermAvantRecalcProd = FALSE)
+saveRDS(interm22[["HRM_Base"]], paste0(PathTest, "HRMlong_C29_100MoE_VarPostTransition_horsUE.rds"))
+MRIO_horsUE <- CompoMRIO(interm22[["HRM_Base"]], typeCompo = "OptFullOptionsBonus", date = 2019)
+gc()
+
+saveRDS(MRIO, "0_DepartSansChangement.rds")
+saveRDS(MRIObis, "1_Baseline.rds")
+saveRDS(MRIO_CIdom, "2b_DontDontContrib_CIdom.rds")
+saveRDS(MRIO_CIall, "2_DontContrib_CI.rds")
+saveRDS(MRIO_DFdom, "3b_DontDontContrib_DFdom.rds")
+saveRDS(MRIO_DFall, "3_DontContrib_DF.rds")
+saveRDS(MRIO_ESP, "4a_substit_ESP.rds")
+saveRDS(MRIO_CHN, "4d_substit_CHN.rds")
+saveRDS(MRIO_horsUE, "4c_substit_horsUE.rds")
+saveRDS(MRIO_DEU, "4b_substit_DEU.rds")
+
+
+###### Calculation of variants indicators
+
+# Looping over all 64 industries to build indicators database
+
+MRIO2 <- av_extend_MRIO_dw(MRIO = MRIO, "FIGARO", TypExtension = "StressEmi", Path1 = PathTemp)
+MRIO <- av_extend_MRIO_dw(MRIO2, "FIGARO", TypExtension = "StressVA")
+
+List_Variants <- list("0_DepartSansChangement.rds", "1_Baseline.rds", "2b_DontDontContrib_CIdom.rds", "2_DontContrib_CI.rds", "3b_DontDontContrib_DFdom.rds", "3_DontContrib_DF.rds", "4a_substit_ESP.rds", "4d_substit_CHN.rds", "4c_substit_horsUE.rds", "4b_substit_DEU.rds")
+
+NumVariant <- 1:length(List_Variants)
+
+tic()
+
+for (k in NumVariant) {
+  VariantREF <- List_Variants[[k]]
+  RatioEmploiVA <- readRDS(paste0(PathTest, "ratioEmploiVA_2019.rds"))
+  MRIOVar <- readRDS(VariantREF)
+  MRIO2 <- av_extend_MRIO_dw(MRIO = MRIOVar, "FIGARO", TypExtension = "StressEmi", Path1 = PathTemp)
+  MRIOVar <- av_extend_MRIO_dw(MRIO2, "FIGARO", TypExtension = "StressVA")
+  MRIOVar[["EmiOverOuput"]] <- MRIO[["EmiOverOuput"]] # Be careful : we need to keep initial Emi / Ouptut because Ouput is recalculated by HRM and emissions does not fit this new output but initial one.
+
+  Indic_interm <- IndicVariant_IndusCountry("C29", CountryREF = "FRA", ListCountryREF = c("FRA", "DEU", "GBR", "ESP", "ITA"), MRIO, MRIOVar, RatioEmploiVA)
+  Indic_interm <- Indic_interm[, Variant := VariantREF]
+
+  if (k == 1) {
+    Base_Indic_HRM <- Indic_interm
+  } else {
+    Base_Indic_HRM <- rbind(Base_Indic_HRM, Indic_interm)
+  }
+  gc()
+  print(paste0("Indicator for ", VariantREF, " OK"))
+}
+
+toc()
+
+saveRDS(Base_Indic_HRM, "Base_Indic_HRM_Variants.rds")
+
+### Data formatting in table format
+
+Res_Variants <- readRDS("Base_Indic_HRM_Variants.rds")
+
+Res_Variants <- Res_Variants[TypeRes == "1_DiffProdVANiv", value := 10 * value / 1000]
+Res_Variants <- Res_Variants[TypeRes == "2_DiffMadeInPct", value := 1000 * value]
+Res_Variants <- Res_Variants[TypeRes == "3_DiffEmploisNiv", value := 10 * value]
+Res_Variants <- Res_Variants[TypeRes == "3bis_DiffEmploisDirectNiv", value := 10 * value]
+Res_Variants <- Res_Variants[TypeRes == "4_DiffAggFootprintCO2Niv", value := 10 * value]
+Res_Variants <- Res_Variants[TypeRes == "5_DiffAggFootprintCO2Pct", value := 10 * value]
+Res_Variants <- Res_Variants[TypeRes == "6_DiffEmiProd", value := 10 * value]
+Res_Variants <- Res_Variants[TypeRes == "7_DiffEmiWorld", value := 10 * value]
+Res_Variants <- Res_Variants[TypeRes == "8_DiffSoldExtNiv", value := 10 * value]
+Res_Variants <- Res_Variants[TypeRes == "9_DiffSoldExtPct", value := 10 * value]
+
+###################################################################################
+### Complementary indicators
+
+indics <- Res_Variants
+
+VA_orig <- MRIO[["VA"]][Col_Country == "FRA", ]
+print(sum(VA_orig$value))
+
+PROD_orig <- MRIO[["PROD"]]
+
+RatioEmploiVA <- readRDS(paste0(PathTest, "ratioEmploiVA_2019.rds"))
+Emploi_orig <- VA_orig # init
+Emploi_orig$value <- RatioEmploiVA$vect * VA_orig$value
+
+Emi_orig <- MRIO[["VA"]] # init
+Emi_orig$value <- as.data.frame(Mult2_rcpp3(MRIO[["EmiOverOuput"]], as.matrix(MRIO[["PROD"]]$value)), drop = FALSE)
+Emi_orig <- setDT(Emi_orig)
+Emi_orig <- Emi_orig[Col_Country == "FRA", ]
+
+# Looping over variants to calculate direct et indirect effects on VA, Output
+List_Variants <- list("0_DepartSansChangement.rds", "1_Baseline.rds", "2b_DontDontContrib_CIdom.rds", "2_DontContrib_CI.rds", "3b_DontDontContrib_DFdom.rds", "3_DontContrib_DF.rds", "4a_substit_ESP.rds", "4d_substit_CHN.rds", "4c_substit_horsUE.rds", "4b_substit_DEU.rds")
+
+NumVariant <- 1:length(List_Variants)
+
+tic()
+
+for (k in NumVariant) {
+  VariantREF <- List_Variants[[k]]
+  IndusREF <- "C29"
+  RatioEmploiVA <- readRDS(paste0(PathTest, "ratioEmploiVA_2019.rds"))
+  MRIOVar <- readRDS(VariantREF)
+  MRIO2 <- av_extend_MRIO_dw(MRIO = MRIOVar, "FIGARO", TypExtension = "StressEmi", Path1 = PathTemp)
+  MRIOVar <- av_extend_MRIO_dw(MRIO2, "FIGARO", TypExtension = "StressVA")
+
+  Prod_direct <- (MRIOVar[["PROD"]][Lig_Country == "FRA" & Lig_Indus == IndusREF, sum(value)] - MRIO[["PROD"]][Lig_Country == "FRA" & Lig_Indus == IndusREF, sum(value)]) / 1000
+  Prod_indirect <- (MRIOVar[["PROD"]][Lig_Country == "FRA" & Lig_Indus != IndusREF, sum(value)] - MRIO[["PROD"]][Lig_Country == "FRA" & Lig_Indus != IndusREF, sum(value)]) / 1000
+  Prod_tot <- (MRIOVar[["PROD"]][Lig_Country == "FRA", sum(value)] - MRIO[["PROD"]][Lig_Country == "FRA", sum(value)]) / 1000
+  VA_direct <- (MRIOVar[["VA"]][Col_Country == "FRA" & Col_Indus == IndusREF, sum(value)] - MRIO[["VA"]][Col_Country == "FRA" & Col_Indus == IndusREF, sum(value)]) / 1000
+  VA_indirect <- (MRIOVar[["VA"]][Col_Country == "FRA" & Col_Indus != IndusREF, sum(value)] - MRIO[["VA"]][Col_Country == "FRA" & Col_Indus != IndusREF, sum(value)]) / 1000
+  VA_tot <- (MRIOVar[["VA"]][Col_Country == "FRA", sum(value)] - MRIO[["VA"]][Col_Country == "FRA", sum(value)]) / 1000
+
+  DirIndir_interm <- data.table(
+    Lig_Country = c("FRA", "FRA", "FRA", "FRA", "FRA", "FRA"),
+    variant = rep(VariantREF, 5),
+    TypeRes = c("Prod_direct", "Prod_indirect", "Prod_tot", "VA_direct", "VA_indirect", "VA_tot"),
+    value = c(Prod_direct, Prod_indirect, Prod_tot, VA_direct, VA_indirect, VA_tot)
+  )
+
+  if (k == 1) {
+    Base_DirIndir <- DirIndir_interm
+  } else {
+    Base_DirIndir <- rbind(Base_DirIndir, DirIndir_interm)
+  }
+
+  print(paste0("Indicator for ", VariantREF))
+}
+
+Base_DirIndir <- Base_DirIndir[, value := 10 * value] # To go back to 1 Md
+
+saveRDS(Base_DirIndir, paste0(PathTest, "Base_IndicCompl_VariantsHRM_100MoE.rds"))
+
+
+### Merge tables
+Base_DirIndir <- readRDS(paste0(PathTest, "Base_IndicCompl_VariantsHRM_100MoE.rds"))
+setnames(Base_DirIndir, "variant", "Variant")
+dl_indics <- rbind(Res_Variants, Base_DirIndir)
+Res_Variants <- dl_indics
+
+saveRDS(dl_indics, paste0(PathTest, "Indics_Variants.rds"))
+
+### Calculate Prod / VA indicator
+Interm_prod <- MRIO[["PROD"]]
+Interm_VA <- MRIO[["VA"]]
+RatioProdSurVA <- Interm_prod[Lig_Country == "FRA" & Lig_Indus == "C29", sum(value)] / Interm_VA[Col_Country == "FRA" & Col_Indus == "C29", sum(value)]
+print(RatioProdSurVA)
+
+### Output formatting
+Res_Variants <- readRDS(paste0(PathTest, "Indics_Variants.rds"))
+Res_VariantsFRA <- Res_Variants[Lig_Country == "FRA", ]
+Res_Variants_tab <- dcast(Res_VariantsFRA, Variant ~ TypeRes, value.var = "value")
+List_colmunsSelect <- c("Variant", "1_DiffProdVANiv", "2_DiffMadeInPct", "3_DiffEmploisNiv", "4_DiffAggFootprintCO2Niv", "6_DiffEmiProd", "7_DiffEmiWorld", "Prod_direct", "Prod_indirect", "Prod_tot", "VA_direct", "VA_indirect")
+Res_Variants_tab_select <- Res_Variants_tab[, ..List_colmunsSelect]
+setnames(Res_Variants_tab_select, c("Variant", "1_DiffProdVANiv", "2_DiffMadeInPct", "3_DiffEmploisNiv", "4_DiffAggFootprintCO2Niv", "6_DiffEmiProd", "7_DiffEmiWorld", "Prod_direct", "Prod_indirect", "Prod_tot", "VA_direct", "VA_indirect"), c("Variant", "VA (Md€)", "Made in (centièmes de points de %)", "Emploi (en milliers de pers phy)", "Empreinte CO2 de la France", "Emissions de CO2 françaises (inventaire)", "Emissions de CO2 mondiales", "Prod dir (Md€)", "Prod indir (Md€)", "Prod (Md€)", "VA dir (Md€)", "VA indir (Md€)"))
+
+Res_Variants_tab_select$"Multiplicateur de VA" <- Res_Variants_tab_select$"VA (Md€)"
+Res_Variants_tab_select$"Multiplicateur de Production" <- Res_Variants_tab_select$"Prod (Md€)" / RatioProdSurVA
+Res_Variants_tab_select$"Emissions de CO2 hors France" <- Res_Variants_tab_select$"Emissions de CO2 mondiales" - Res_Variants_tab_select$"Emissions de CO2 françaises (inventaire)"
+
+Res_Variants_tab_select <- Res_Variants_tab_select[, c("Variant", "VA (Md€)", "VA dir (Md€)", "VA indir (Md€)", "Multiplicateur de VA", "Prod (Md€)", "Prod dir (Md€)", "Prod indir (Md€)", "Multiplicateur de Production", "Made in (centièmes de points de %)", "Emploi (en milliers de pers phy)", "Emissions de CO2 mondiales", "Emissions de CO2 françaises (inventaire)", "Emissions de CO2 hors France", "Empreinte CO2 de la France")]
+
+saveRDS(Res_Variants_tab_select, paste0(PathTest, "Res_Variants_C29.rds"))
+
+write.xlsx(Res_Variants_tab_select, "HRM Variants.xlsx", sheetName = "variants", col.names = TRUE, row.names = TRUE)
+```
+
+
+
+#SUPPLEMENTARY INFORMATIONS : Variant Automobile post-climatic-transition
+
+To consider the effects of the transition to electric cars, we have added a modelling step which consists of :
+  - Adjusting the intermediate consumptions of the TIES in order to take into account a greater use of electrical/electronic components and a lesser use of thermal or connected components.
+  - Adjusting final consumption to take into account higher household consumption of electricity and lower consumption of petroleum products.
+  - Adjust the employment intensity of the automotive product to take account of greater automation and less labour-intensive tasks.
+  
+As the adjustments were made to the TIES, and as we were constrained to keep the counterfactual situation of the world economy at an unchanged size (same GDP before and after adjustments), we proceeded by substitution at the level of intermediate consumption and at the level of final demand. Furthermore, as the energy transition is likely to affect all countries in the more or less long term, we have made adjustments uniformly across all countries. No assumption has been made as to which countries are leaders or ahead of the others. Finally, the central scenario adopted in this analysis is not that of substitution with all importing countries, but rather that of substitution with importing countries outside the EU (particularly with a view to substitution with the Asian bloc).
+
+Within NAF rev.2, the manufacture of internal combustion engines is classified in product C29 (automotive), the manufacture of electric motors in product 27 (manufacture of electrical equipment) as is the manufacture of batteries for motor vehicles (in 27.20Z). Similarly, auxiliary motors used to facilitate starting (hybrid cars equipped with an electric motor for the starting phase and a combustion engine that takes over) are classified in 27 (cf. 27.11Z). NAF class 28 includes parts for internal combustion engines (28.11.4), such as cylinder blocks, crankcases, cylinder heads, connecting rods, pistons and piston rings, valves, carburettors and injectors.
+
+In terms of technical coefficients, the post-transition situation will mean :
+  - Greater reliance by the automotive branch (C29) on the electrical equipment branch (C27).
+  - less reliance by the automotive branch (C29) on the production of internal combustion engines (C29 branch)
+  - less reliance by the motor vehicle industry (C29) on the manufacture of machinery and equipment (C28).
+
+
+In practice, we introduce three parameters:
+  - Employment intensity (value = 0.9 => 10% drop in employment intensity in the automotive industry)
+  - Intermediate consumption substitution intensity: value = 0.9 => the technical coefficient of each country's automotive industry (C29) in products C29 and C28 (domestic and imported) is reduced by 10%, and the sum of these two amounts is added to intermediate consumption of product C29 in product C27, for each country.
+  - The intensity of final consumption substitution: value = 0.9 => each country's final demand for oil products (C19) is reduced by 10%, and this amount is transferred to electricity products (D35) for each country.
+The adjustments made are therefore zero-sum on intermediate consumption and final demand. The simulations are called by their X-Y-Z parameters: for example, 09-08-07 will correspond to a parameter of 0.9 for employment, 0.8 for intermediate consumption and 0.7 for final demand.
+
+The decomposition highlights strong structural effects linked to the transition (component P1 presented) but limited changes (component P2) in import substitution compared to the pre-transition situation (column C29_Outside the EU).
+We have also varied the parameters (Table 2), in order to assess the robustness of this diagnosis. It appears that the results are little altered by the parameters. In fact, the transition to electric vehicles should not modify the messages of the simulations carried out on the automotive sector.
+
+##################
+Here are the codes to check climatic post-transition robustness.
+
+```{r}
+# Robustness checks
+saveRDS(av_fun_VarPostTransition(paramEmploi = 1, paramA = 1, paramDF = 1), "Variant_PostTransition_param_1_1_1.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 0.99, paramA = 0.99, paramDF = 0.99), "Variant_PostTransition_param_099_099_099.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 0.9, paramA = 0.95, paramDF = 0.95), "Variant_PostTransition_param_09_095_095.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 0.9, paramA = 0.9, paramDF = 0.9), "Variant_PostTransition_param_09_09_09.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 0.9, paramA = 0.8, paramDF = 0.7), "Variant_PostTransition_param_09_08_07.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 0.9, paramA = 0.6, paramDF = 0.5), "Variant_PostTransition_param_09_06_05.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 0.8, paramA = 0.4, paramDF = 0.4), "Variant_PostTransition_param_08_04_04.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 1, paramA = 0.9, paramDF = 0.9), "Variant_PostTransition_param_1_09_09.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 1, paramA = 0.95, paramDF = 0.95), "Variant_PostTransition_param_1_095_095.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 0.99, paramA = 0.9, paramDF = 0.9), "Variant_PostTransition_param_099_09_09.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 0.99, paramA = 1, paramDF = 1), "Variant_PostTransition_param_099_1_1.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 1, paramA = 0.99, paramDF = 1), "Variant_PostTransition_param_1_099_1.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 1, paramA = 1, paramDF = 0.99), "Variant_PostTransition_param_1_1_099.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 1, paramA = 0.98, paramDF = 1), "Variant_PostTransition_param_1_098_1.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 1, paramA = 0.97, paramDF = 1), "Variant_PostTransition_param_1_097_1.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 1, paramA = 0.96, paramDF = 1), "Variant_PostTransition_param_1_096_1.rds")
+saveRDS(av_fun_VarPostTransition(paramEmploi = 1, paramA = 0.95, paramDF = 1), "Variant_PostTransition_param_1_095_1.rds")
+gc()
+
+a0 <- readRDS("Variant_PostTransition_param_08_04_04.rds")
+a1 <- readRDS("Variant_PostTransition_param_09_06_05.rds")
+a2 <- readRDS("Variant_PostTransition_param_09_08_07.rds")
+a3 <- readRDS("Variant_PostTransition_param_09_09_09.rds")
+a4 <- readRDS("Variant_PostTransition_param_09_095_095.rds")
+a5 <- readRDS("Variant_PostTransition_param_099_099_099.rds")
+a6 <- readRDS("Variant_PostTransition_param_1_1_1.rds")
+a7 <- readRDS("Variant_PostTransition_param_1_09_09.rds")
+a8 <- readRDS("Variant_PostTransition_param_1_095_095.rds")
+a9 <- readRDS("Variant_PostTransition_param_099_09_09.rds")
+a10 <- readRDS("Variant_PostTransition_param_099_1_1.rds")
+a11 <- readRDS("Variant_PostTransition_param_1_099_1.rds")
+a12 <- readRDS("Variant_PostTransition_param_1_1_099.rds")
+a13 <- readRDS("Variant_PostTransition_param_1_098_1.rds")
+a14 <- readRDS("Variant_PostTransition_param_1_097_1.rds")
+a15 <- readRDS("Variant_PostTransition_param_1_096_1.rds")
+a16 <- readRDS("Variant_PostTransition_param_1_095_1.rds")
+gc()
+
+write.xlsx(a0, "variantAuto_PostTransition.xlsx", sheetName = "08_04_04", col.names = TRUE, row.names = TRUE)
+write.xlsx(a1, "variantAuto_PostTransition.xlsx", sheetName = "09_06_05", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a2, "variantAuto_PostTransition.xlsx", sheetName = "09_08_07", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a3, "variantAuto_PostTransition.xlsx", sheetName = "09_09_09", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a4, "variantAuto_PostTransition.xlsx", sheetName = "09_095_095", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a5, "variantAuto_PostTransition.xlsx", sheetName = "099_099_099", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a6, "variantAuto_PostTransition.xlsx", sheetName = "1_1_1", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a7, "variantAuto_PostTransition.xlsx", sheetName = "1_09_09", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a8, "variantAuto_PostTransition.xlsx", sheetName = "1_095_095", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a9, "variantAuto_PostTransition.xlsx", sheetName = "099_09_09", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a10, "variantAuto_PostTransition.xlsx", sheetName = "099_1_1", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a11, "variantAuto_PostTransition.xlsx", sheetName = "1_099_1", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a13, "variantAuto_PostTransition.xlsx", sheetName = "1_098_1", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a14, "variantAuto_PostTransition.xlsx", sheetName = "1_097_1", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a15, "variantAuto_PostTransition.xlsx", sheetName = "1_096_1", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a16, "variantAuto_PostTransition.xlsx", sheetName = "1_095_1", col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(a12, "variantAuto_PostTransition.xlsx", sheetName = "1_1_099", col.names = TRUE, row.names = TRUE, append = TRUE)
+gc()
+
+### Formatting for appendice
+a0 <- readRDS("Variant_PostTransition_param_08_04_04.rds")
+a1 <- readRDS("Variant_PostTransition_param_09_06_05.rds")
+a2 <- readRDS("Variant_PostTransition_param_09_08_07.rds")
+a3 <- readRDS("Variant_PostTransition_param_09_09_09.rds")
+a4 <- readRDS("Variant_PostTransition_param_09_095_095.rds")
+a5 <- readRDS("Variant_PostTransition_param_099_099_099.rds")
+
+REF <- data.table::copy(a2)
+setnames(REF, c("C29", "C29_HorsUE", "C29_PostTransition", "C29_PostTransition_P1", "C29_PostTransition_P2"), c("Origin", "Baseline_VariantHorsUE", "Variant_09_08_07", "PostTransition_StructPart_09_08_07", "HRM_Part_09_08_07"))
+REF$Variant_08_04_04 <- a0$C29_PostTransition
+REF$PostTransition_StructPart_08_04_04 <- a0$C29_PostTransition_P1
+REF$HRM_Part_08_04_04 <- a0$C29_PostTransition_P2
+REF$Variant_09_06_05 <- a1$C29_PostTransition
+REF$PostTransition_StructPart_09_06_05 <- a1$C29_PostTransition_P1
+REF$HRM_Part_09_06_05 <- a1$C29_PostTransition_P2
+REF$Variant_09_09_09 <- a3$C29_PostTransition
+REF$PostTransition_StructPart_09_09_09 <- a3$C29_PostTransition_P1
+REF$HRM_Part_09_09_09 <- a3$C29_PostTransition_P2
+REF$Variant_09_095_095 <- a4$C29_PostTransition
+REF$PostTransition_StructPart_09_095_095 <- a4$C29_PostTransition_P1
+REF$HRM_Part_09_095_095 <- a4$C29_PostTransition_P2
+REF$Variant_099_099_099 <- a5$C29_PostTransition
+REF$PostTransition_StructPart_099_099_099 <- a5$C29_PostTransition_P1
+REF$HRM_Part_099_099_099 <- a5$C29_PostTransition_P2
+
+REF <- REF[TypeRes %in% c("1_DiffProdVANiv", "2_DiffMadeInPct", "3_DiffEmploisNiv", "4_DiffAggFootprintCO2Niv", "6_DiffEmiProd", "7_DiffEmiWorld"), ]
+REF <- REF[TypeRes == "1_DiffProdVANiv", TypeRes := "VA (Md€)"]
+REF <- REF[TypeRes == "2_DiffMadeInPct", TypeRes := "Made in (centièmes de points de %)"]
+REF <- REF[TypeRes == "3_DiffEmploisNiv", TypeRes := "Emploi (en milliers de pers phy)"]
+REF <- REF[TypeRes == "4_DiffAggFootprintCO2Niv", TypeRes := "Empreinte CO2 de la France"]
+REF <- REF[TypeRes == "6_DiffEmiProd", TypeRes := "Emissions de CO2 françaises (inventaire)"]
+REF <- REF[TypeRes == "7_DiffEmiWorld", TypeRes := "Emissions de CO2 mondiales"]
+saveRDS(REF, "Variant_PostTransition_Robustness.rds")
+gc()
+
+########################################################################################################
+############## SPA : Structural Path Analysis
+## Simplified analysis here because real fitted parameters needs more calculation power.
+
+Baseline <- readRDS(paste0(PathTest, "HRMlong_REF_FIG2019_100MoE.rds"))
+Variant <- readRDS(paste0(PathTest, "HRMlong_", IndusREF, "_100MoE_VarPostTransition.rds"))
+Variant <- readRDS(paste0(PathTest, "HRMlong_C29_100MoE.rds"))
+
+Detailed_check_Path <- av_MRIO_comparison(Baseline, Variant, Optdl = T, OptVerbose = F)
+gc()
+
+### Simplified SPA on value added
+# Real Fitted FIGARO VA parameters should be : ListThres = {GenThres=0.001,Thres_L2_1=0.001,Thres_L3_1=0.001,Thres_L3_2=0.001,Thres_L3_3=0.00001,Thres_L3_4=0.001,Thres_L4_1=0.001,Thres_L4_2=0.001,Thres_L4_3=0.000005,Thres_L4_4=0.001,Thres_L5_1=0.001,Thres_L5_2=0.001,Thres_L5_3=0.000001,Thres_L5_4=0.001,Thres_L6_1=0.001,Thres_L6_2=0.001,Thres_L6_3=0.0000005,Thres_L6_4=0.001,Thres_L7_1=0.001,Thres_L7_2=0.001,Thres_L7_3=0.0000001,Thres_L7_4=0.001}
+
+seuil <- 0.2 # 0.05
+ListThres <- list(GenThres = seuil, Thres_L2_1 = seuil, Thres_L3_1 = seuil, Thres_L3_2 = seuil, Thres_L3_3 = seuil, Thres_L3_4 = seuil, Thres_L4_1 = seuil, Thres_L4_2 = seuil, Thres_L4_3 = seuil, Thres_L4_4 = seuil, Thres_L5_1 = seuil, Thres_L5_2 = seuil, Thres_L5_3 = seuil, Thres_L5_4 = seuil, Thres_L6_1 = seuil, Thres_L6_2 = seuil, Thres_L6_3 = seuil, Thres_L6_4 = seuil, Thres_L7_1 = seuil, Thres_L7_2 = seuil, Thres_L7_3 = seuil, Thres_L7_4 = seuil)
+
+Diff_variantAuto_VA <- av_Diff_SPA(Baseline, Variant, ListThres, TypContenu = "VA")
+saveRDS(Diff_variantAuto_VA, "Diff_variantAuto_VA.rds")
+gc()
+
+# Simplified SPA on carbon footprint
+# Real Fitted FIGARO Emi parameters : ListThres = {GenThres=0.001,Thres_L2_1=0.0001,Thres_L3_1=0.0001,Thres_L3_2=0.00001,Thres_L3_3=0.000005,Thres_L3_4=0.0001,Thres_L4_1=0.0001,Thres_L4_2=0.00001,Thres_L4_3=0.000005,Thres_L4_4=0.00001,Thres_L5_1=0.001,Thres_L5_2=0.0001,Thres_L5_3=0.000004,Thres_L5_4=0.000001,Thres_L6_1=0.0001,Thres_L6_2=0.00001,Thres_L6_3=0.000004,Thres_L6_4=0.0000001,Thres_L7_1=0.0005,Thres_L7_2=0.00005,Thres_L7_3=0.0000005,Thres_L7_4=0.001}
+
+seuil <- 0.2 # 0.02
+ListThres <- list(GenThres = seuil, Thres_L2_1 = seuil, Thres_L3_1 = seuil, Thres_L3_2 = seuil, Thres_L3_3 = seuil, Thres_L3_4 = seuil, Thres_L4_1 = seuil, Thres_L4_2 = seuil, Thres_L4_3 = seuil, Thres_L4_4 = seuil, Thres_L5_1 = seuil, Thres_L5_2 = seuil, Thres_L5_3 = seuil, Thres_L5_4 = seuil, Thres_L6_1 = seuil, Thres_L6_2 = seuil, Thres_L6_3 = seuil, Thres_L6_4 = seuil, Thres_L7_1 = seuil, Thres_L7_2 = seuil, Thres_L7_3 = seuil, Thres_L7_4 = seuil)
+
+Diff_variantAuto_Emi <- av_Diff_SPA(Baseline, Variant, ListThres, TypContenu = "Emi", PathEmi = PathTemp)
+saveRDS(Diff_variantAuto_Emi, "Diff_variantAuto_Emi.rds")
+gc()
+
+Diff_variantAuto_VA <- readRDS("Diff_variantAuto_VA.rds")
+Diff_variantAuto_Emi <- readRDS("Diff_variantAuto_Emi.rds")
+Diff_variantAuto_VA <- Diff_variantAuto_VA[, diffValue := 10 * diffValue]
+
+
+# Choice of the Path
+
+MonPass_sorted <- Diff_variantAuto_VA ### Here choose the variant : VA or Emi
+
+MonPass_sorted <- MonPass_sorted[, c("deb", "fin", "path", "Pathvalue", "diffValue")]
+
+# Selection of data for tests or full size
+# Path<-MonPass_sorted
+PathVA <- MonPass_sorted[1:5000, ]
+MonPass_sorted <- Diff_variantAuto_Emi ### Here choose the variant : VA or Emi
+MonPass_sorted <- MonPass_sorted[, c("deb", "fin", "path", "Pathvalue", "diffValue")]
+
+# Selection of data for tests or real
+# Path<-MonPass_sorted
+PathEmi <- MonPass_sorted[1:5000, ]
+
+saveRDS(PathVA, "Diff_variantAuto_VAsimplif.rds")
+saveRDS(PathEmi, "Diff_variantAuto_Emisimplif.rds")
+
+# Data manipulation
+Path$deb_pays <- str_extract(Path$deb, "[^_]+")
+Path$deb_Indus <- substring(str_extract(Path$deb, "_.+$"), 2)
+Path$fin_pays <- str_extract(Path$fin, "[^_]+")
+Path$fin_Indus <- substring(str_extract(Path$fin, "_.+$"), 2)
+
+# Main path differences for the footprint of a given product, for example in the automobile sector: what does it change for manufacture of electrical equipment sector ?
+Path_auto <- Path[fin_Indus == "C27", ]
+Path_auto_IMP <- Path[fin_Indus == "C27" & deb_pays != "FRA", ]
+Path_auto_FRA <- Path[fin_Indus == "C27" & deb_pays == "FRA", ]
+
+write.xlsx(Path_auto[1:500, ], "Spa_variantAuto.xlsx", sheetName = "tous", col.names = TRUE, row.names = TRUE)
+write.xlsx(Path_auto_IMP[1:500, ], "Spa_variantAuto.xlsx", sheetName = "IMP", col.names = TRUE, row.names = TRUE, append = TRUE)
+
+# On Paths starting abroad
+
+ligne <- 2
+Desc <- paste0("initialement ", round(Path_auto_IMP[ligne, "Pathvalue"], 2), " vient de ", Path_auto_IMP[ligne, "deb"], " et arrive dans la demande finale Française en produit ", Path_auto_IMP[ligne, "fin_Indus"], " en passant par ", Path_auto_IMP[ligne, "path"], " : ce montant est revu de ", round(Path_auto_IMP[ligne, "diffValue"], 2), " dans cette variante")
+print(Desc)
+
+# On Paths starting out in France
+
+ligne <- 2
+Desc <- paste0("initialement ", round(Path_auto_FRA[ligne, "Pathvalue"], 2), " vient de ", Path_auto_FRA[ligne, "deb"], " et arrive dans la demande finale Française en produit ", Path_auto_FRA[ligne, "fin_Indus"], " en passant par ", Path_auto_FRA[ligne, "path"], " : ce montant est revu de ", round(Path_auto_FRA[ligne, "diffValue"], 2), " dans cette variante")
+print(Desc)
+
+# Variant deviations by country of origin
+Empr_imp_bycountry <- Path[deb_pays != "FRA", sum(diffValue), by = c("deb_pays")]
+Empr_imp_bycountry <- Empr_imp_bycountry[order(-abs(V1))]
+Empr_imp_bycountry_auto <- Path_auto[deb_pays != "FRA", sum(diffValue), by = c("deb_pays")]
+Empr_imp_bycountry_auto <- Empr_imp_bycountry_auto[order(-abs(V1))]
+
+# Variant deviations by branch of origin
+Empr_imp_byindus <- Path[deb_pays != "FRA", sum(diffValue), by = c("deb_Indus")]
+Empr_imp_byindus <- Empr_imp_byindus[order(-abs(V1))]
+Empr_imp_byindus_auto <- Path_auto[deb_pays != "FRA", sum(diffValue), by = c("deb_Indus")]
+Empr_imp_byindus_auto <- Empr_imp_byindus_auto[order(-abs(V1))]
+
+# Identify the main gaps in the path that leave France, return to France, and pass through other countries (what weight do these represent in the footprint?).
+List_paysHorsFRA <- unique(Path[fin_pays != "FRA", paste0(fin_pays, "_")])
+List_paysHorsFRAun <- unlist(List_paysHorsFRA)
+Paths_FRAFRA <- Path[deb_pays == "FRA" & fin_pays == "FRA", ] # Selection 1 : FRA -> FRA
+Paths_FRA_x_FRA <- Paths_FRAFRA %>%
+  filter(str_detect(Paths_FRAFRA$path, paste(List_paysHorsFRAun, collapse = "|"))) # Selection 2 : paths that take you abroad
+print(sum(Paths_FRA_x_FRA$Pathvalue) / sum(MonPass_sorted$Pathvalue)) # Proportion (in %) of paths passing through foreign countries before returning to France
+```
+
+
+
+
+
+
+#N. Autarky.
+
+##N. The polar case of autarky
+
+```{r}
+### Loading reference data
+BASE_FIG <- readRDS(paste0(PathTemp, "BDn_FIG.rds"))
+MRIO <- CompoMRIO(BASE_FIG, typeCompo = "OptFullOptionsBonus", date = 2019)
+
+
+
+FIG2019_Autarky <- Autarky(MRIO, Optdl = FALSE, OptSaveRDS = TRUE)
+FIG2019_Autarky_bis <- Autarky(BASE_FIG, Optdl = TRUE, OptSaveRDS = FALSE)
+
+
+#### Made-in comparison (should be 100%)
+YearREF <- 2019
+
+MadeIn_MRIO <- av_MadeIn(BASE_FIG, Optdl = TRUE, YearREF, OptDonneesBrutes = FALSE)
+gc()
+FIG2019_Autarky_dl <- dw_to_dl(FIG2019_Autarky)
+FIG_2019 <- BASE_FIG[year == 2019, ]
+
+MadeIn_MRIOAutarky <- av_MadeIn(FIG2019_Autarky_dl, Optdl = TRUE, YearREF, OptDonneesBrutes = FALSE)
+gc()
+
+Diff_MadeIn_Autarky <- MadeIn_MRIO[["ratio_Tot"]] # Init
+Diff_MadeIn_Autarky$value <- 100 * (MadeIn_MRIOAutarky[["ratio_Tot"]]$value - MadeIn_MRIO[["ratio_Tot"]]$value)
+
+# --> Output Made-in :
+Val_diff_MadeInAutarky <- Diff_MadeIn_Autarky[, c("Col_Country", "value")][, TypeRes := "2_DiffMadeInAutarkyPct"]
+print(Val_diff_MadeInAutarky)
+print(Val_diff_MadeInAutarky)
+
+
+##### Output comparison
+
+Compar_Prod <- FIG2019_Autarky[["PROD"]] # init
+Compar_Prod$value <- FIG2019_Autarky[["PROD"]]$value - MRIO[["PROD"]]$value
+Compar_Prod <- Compar_Prod[, sum(value), by = c("Lig_Country")]
+setnames(Compar_Prod, "V1", "value")
+Compar_Prod <- Compar_Prod[order(-abs(value))]
+
+Compar_Prod_Autarky <- Compar_Prod[, c("Lig_Country", "value")][, TypeRes := "1_DiffProdNiv"]
+
+##### Footprint comparison and inventory link with footprint (should be the same)
+
+MRIO <- av_extend_MRIO_dw(MRIO_dw = MRIO, "FIGARO", TypExtension = "StressEmi", Path1 = PathTemp)
+EmpreinteCO2MRIOp <- Contenus(MRIO, typeContenu = "Emi", MethContenu = "MatDF", EmprPays = "FRA")
+gc()
+interm_MRIO <- EmpreinteCO2MRIOp[["MatEmpreinte_dt"]][, year := "2019"] # year factice pour Reqsum
+interm_MRIO <- ReqSum(interm_MRIO, c("Lig_Country", "Col_Indus", "Lig_Indus"))
+
+FIG2019_Autarky <- av_extend_MRIO_dw(MRIO_dw = FIG2019_Autarky, "FIGARO", TypExtension = "StressEmi", Path1 = PathTemp)
+EmpreinteCO2MRIObisp <- Contenus(FIG2019_Autarky, typeContenu = "Emi", MethContenu = "MatDF", EmprPays = "FRA")
+gc()
+interm_MRIObis <- EmpreinteCO2MRIObisp[["MatEmpreinte_dt"]][, year := "2019"] # year factice pour Reqsum
+interm_MRIObis <- ReqSum(interm_MRIObis, c("Lig_Country", "Col_Indus", "Lig_Indus"))
+
+Res_empreinte <- interm_MRIO # init
+Res_empreinte$value <- interm_MRIObis$value - interm_MRIO$value
+Res_empreinte$valuePct <- (interm_MRIObis$value - interm_MRIO$value) / interm_MRIO$value * 100
+Res_empreinte <- Res_empreinte[order(-abs(value))]
+
+P1 <- Res_empreinte[, c("Col_Country", "value")][, TypeRes := "4_DiffEmpCO2Niv"]
+P2 <- Res_empreinte[, c("Col_Country", "valuePct")][, TypeRes := "5_DiffEmpCO2Pct"]
+setnames(P2, "valuePct", "value")
+Res_empreinte_select <- rbind(P1, P2)
+
+# We check that the production emissions are equal to the consumption footprint.
+EmpreinteCO2MRIODiag <- Contenus(MRIO, typeContenu = "Emi", MethContenu = "DiagDFpays", EmprPays = "FRA")
+Empr_ApprProdREF <- EmpreinteCO2MRIODiag[["Empreinte_Production"]]
+Empr_ApprConsoREF <- EmpreinteCO2MRIODiag[["Empreinte_Conso"]]
+
+EmpreinteCO2MRIObispDiag <- Contenus(FIG2019_Autarky, typeContenu = "Emi", MethContenu = "DiagDFpays", EmprPays = "FRA")
+Empr_ApprProd <- EmpreinteCO2MRIObispDiag[["Empreinte_Production"]]
+Empr_ApprConso <- EmpreinteCO2MRIObispDiag[["Empreinte_Conso"]]
+```

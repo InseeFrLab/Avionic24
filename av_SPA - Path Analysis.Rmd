@@ -1,0 +1,374 @@
+---
+title: "Structural path analysis (SPA) applied to HRM simulations"
+output: html_notebook
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  eval = FALSE,
+  echo = TRUE
+)
+```
+
+#Structural path analysis (SPA) applied to HRM simulations
+
+In this workbook we use HRM results to apply structural path analysis.
+
+The path analysis method can be used to identify the most contributing paths within a footprint calculation. This is in itself interesting information, but its output corresponds to a list of paths, most of which are relatively expected (those linked to energy in the case of the carbon footprint, for example). The originality of our use of this path analysis in this work consists in identifying path adjustments when simulating the location of an activity in one country rather than another. Path anaylsis is therefore viewed here in differential rather than in level, and we derive much more relevant information from it, as it is directly linked to the simulation being carried out. We can thus determine the main value chain adjustments (at a detailed level) that are linked to a simulation. Over and above the expected adjustments, this new information makes it possible to precisely quantify the collateral effects on other countries or industries resulting from value chain adjustments, information which seems very difficult to access by other means.
+
+You should note that beyond the global threshold defined at the outset for filtering, it is necessary to empirically introduce specific filters for paths of rank 3 and above. These specific filters depend both on the MRIO base used and on the problem being addressed, so even if the method remains generalist in nature, it requires parameters to be defined empirically in order to optimize the paths selected according to software capabilities, the MRIO used and the problem being addressed. In fact, depending on the issues being addressed, the number of layers required to cover the footprint will depend to a large extent on the stressor vector used: a carbon emissions stressor where the highest amounts are concentrated in certain branches (notably energy) will require more layers than a VA footprint, for example (where data is more homogeneous between branches). This is why the optimization issues are of paramount importance in this method.
+
+##Data loading
+
+```{r}
+## Path
+PathTest<-getwd( )  # "C:/Users/SJOITL/Desktop/temporaire/test/"
+PathTemp<-getwd( )  # "C:/Users/SJOITL/Desktop/temporaire/"
+
+
+DT <- readRDS(paste0(PathTest, "BDn_FIG_2010.rds"))
+Bonus <- CompoMRIO(DT, typeCompo = "OptFullOptionsBonus", date = 2010, OptTab = FALSE)
+dtdl <- Bonus
+Optdl <- FALSE
+TypeSPA <- "VA"
+TargetCountry <- "FRA"
+OptRDS <- ""
+OptRDSDetail <- ""
+OptUE27 <- FALSE
+verbose <- TRUE
+
+ListThres_VA_FIG <- list(GenThres = 0.001, Thres_L2_1 = 0.001, Thres_L3_1 = 0.001, Thres_L3_2 = 0.001, Thres_L3_3 = 0.00001, Thres_L3_4 = 0.001, Thres_L4_1 = 0.001, Thres_L4_2 = 0.001, Thres_L4_3 = 0.000005, Thres_L4_4 = 0.001, Thres_L5_1 = 0.001, Thres_L5_2 = 0.001, Thres_L5_3 = 0.000001, Thres_L5_4 = 0.001, Thres_L6_1 = 0.001, Thres_L6_2 = 0.001, Thres_L6_3 = 0.0000005, Thres_L6_4 = 0.001, Thres_L7_1 = 0.001, Thres_L7_2 = 0.001, Thres_L7_3 = 0.0000001, Thres_L7_4 = 0.001)
+
+ListThres_Emi_FIG <- list(GenThres = 0.001, Thres_L2_1 = 0.0001, Thres_L3_1 = 0.0001, Thres_L3_2 = 0.00001, Thres_L3_3 = 0.000005, Thres_L3_4 = 0.0001, Thres_L4_1 = 0.0001, Thres_L4_2 = 0.00001, Thres_L4_3 = 0.000005, Thres_L4_4 = 0.00001, Thres_L5_1 = 0.001, Thres_L5_2 = 0.0001, Thres_L5_3 = 0.000004, Thres_L5_4 = 0.000001, Thres_L6_1 = 0.0001, Thres_L6_2 = 0.00001, Thres_L6_3 = 0.000004, Thres_L6_4 = 0.0000001, Thres_L7_1 = 0.0005, Thres_L7_2 = 0.00005, Thres_L7_3 = 0.0000005, Thres_L7_4 = 0.001)
+
+seuil <- 0.05
+ListThres_Tests <- list(GenThres = seuil, Thres_L2_1 = seuil, Thres_L3_1 = seuil, Thres_L3_2 = seuil, Thres_L3_3 = seuil, Thres_L3_4 = seuil, Thres_L4_1 = seuil, Thres_L4_2 = seuil, Thres_L4_3 = seuil, Thres_L4_4 = seuil, Thres_L5_1 = seuil, Thres_L5_2 = seuil, Thres_L5_3 = seuil, Thres_L5_4 = seuil, Thres_L6_1 = seuil, Thres_L6_2 = seuil, Thres_L6_3 = seuil, Thres_L6_4 = seuil, Thres_L7_1 = seuil, Thres_L7_2 = seuil, Thres_L7_3 = seuil, Thres_L7_4 = seuil)
+
+SPA_testVA <- av_SPA(dtdl, Optdl = FALSE, TypeSPA = "VA", TypeMRIO = "FIGARO", ListThres = ListThres_Tests, TargetCountry = "FRA", OptRDS = "", OptRDSDetail = "", OptUE27 = FALSE, verbose = TRUE)
+SPA_testVA <- SPA_testVA[order(-Pathvalue)]
+
+seuil <- 0.02 # OK 1025 sec
+ListThres_Tests <- list(GenThres = seuil, Thres_L2_1 = seuil, Thres_L3_1 = seuil, Thres_L3_2 = seuil, Thres_L3_3 = seuil, Thres_L3_4 = seuil, Thres_L4_1 = seuil, Thres_L4_2 = seuil, Thres_L4_3 = seuil, Thres_L4_4 = seuil, Thres_L5_1 = seuil, Thres_L5_2 = seuil, Thres_L5_3 = seuil, Thres_L5_4 = seuil, Thres_L6_1 = seuil, Thres_L6_2 = seuil, Thres_L6_3 = seuil, Thres_L6_4 = seuil, Thres_L7_1 = seuil, Thres_L7_2 = seuil, Thres_L7_3 = seuil, Thres_L7_4 = seuil)
+
+SPA_testEmi <- av_SPA(dtdl, Optdl = FALSE, TypeSPA = "Emi", TypeMRIO = "FIGARO", ListThres = ListThres_Tests, TargetCountry = "FRA", OptRDS = "", OptRDSDetail = "", OptUE27 = FALSE, verbose = TRUE, PathEmi = PathTemp)
+SPA_testEmi <- SPA_testEmi[order(-Pathvalue)]
+
+# Doesn't work with these parameters : only work at INSEE under AUS remote computing
+# SPA_VA_FIG<-av_SPA(dtdl,Optdl=FALSE,TypeSPA="VA",TypeMRIO="FIGARO",ListThres=ListThres_VA_FIG,TargetCountry="FRA",OptRDS="",OptRDSDetail="",OptUE27=FALSE,verbose=TRUE)
+# SPA_Emi_FIG<-av_SPA(dtdl,Optdl=FALSE,TypeSPA="Emi",TypeMRIO="FIGARO",ListThres=ListThres_Emi_FIG,TargetCountry="FRA",OptRDS="",OptRDSDetail="",OptUE27=FALSE,verbose=TRUE,PathEmi=PathTemp)
+```
+
+##What are the references to empirically calculate thresholds ?
+
+Theoretical amounts can be calculated formally realistically products type f*A*A*y by example for row 2, this which defines the contribution of row 2 to footprint total. These amount formels each rank can be reconciled calculations optimized for path analysis each rank, which makes it possible to assess whether the empirically determined thresholds can be improved to increase the representativeness of paths of this rank.
+
+```{r}
+DT <- readRDS(paste0(PathTest, "BDn_FIG_2010.rds"))
+Bonus <- CompoMRIO(DT, typeCompo = "OptFullOptionsBonus", date = 2010, OptTab = FALSE)
+dtdl <- Bonus
+Optdl <- FALSE
+TypeSPA <- "VA"
+TargetCountry <- "FRA"
+TypeMRIO <- "FIGARO"
+
+# Finding reference year according to initial format of the MRIO
+if (Optdl == TRUE) {
+  yearRecup <- as.numeric(dtdl[1, "year"])
+} else {
+  yearRecup <- as.numeric(dtdl[["CI"]][1, "year"])
+}
+
+# Check if input is dt or dl : if dl then calculate dt with optional stressor extension
+if (Optdl == TRUE) {
+  MRIO <- CompoMRIO(dtdl, "OptFullOptionsBonus", date = dtdl[1, "year"]$year, OptUE27 = OptUE27)
+  if (TypeSPA == "VA") {
+    MRIO <- av_extend_MRIO_dw(MRIO, TypeMRIO, TypExtension = "StressVA")
+  }
+  if (TypeSPA == "Emi") {
+    MRIO <- av_extend_MRIO_dw(MRIO, TypeMRIO, TypExtension = "StressEmi", Path1 = PathEmi)
+  }
+} else {
+  List_Interm <- dtdl
+  if (TypeSPA == "VA") {
+    MRIO <- av_extend_MRIO_dw(dtdl, TypeMRIO, TypExtension = "StressVA")
+  }
+  if (TypeSPA == "Emi") {
+    MRIO <- av_extend_MRIO_dw(dtdl, TypeMRIO, TypExtension = "StressEmi", Path1 = PathEmi)
+  }
+}
+MRIO2 <- data.table::copy(MRIO)
+
+# Recuperation of MRIO components for calculations
+A_dt <- MRIO[["A"]]
+A_dt <- AjoutPRBR(A_dt)
+
+if (TypeSPA == "VA") {
+  f_dt <- vectDF(diag(MRIO[["VAOverOuput"]]))
+  f_dt <- GereInfNA(f_dt)
+}
+if (TypeSPA == "Emi") {
+  f_dt <- vectDF(diag(MRIO[["EmiOverOuput"]]))
+  f_dt <- GereInfNA(f_dt)
+}
+
+interm1 <- MRIO[["DF"]][Col_Country == TargetCountry, ]
+interm2 <- interm1[, sum(value), by = c("year", "Lig_Country", "Lig_Indus")]
+setnames(interm2, "V1", "value")
+PourJointure <- MRIO[["DF_TOT"]][, c("Lig_Country", "Lig_Indus")]
+y_dt <- interm2[PourJointure, on = .(Lig_Country, Lig_Indus)]
+DF_FRA_mat <- as.matrix(y_dt$value)
+
+
+interm <- y_dt
+interm$value <- f_dt$vect
+f_dt <- AjoutPRBR(interm)
+y_dt <- AjoutPRBR(y_dt)
+A_dt <- A_dt[, c("PR", "BR", "value")]
+f_dt <- f_dt[, c("PR", "value")]
+y_dt <- y_dt[, c("PR", "value")]
+setnames(y_dt, "PR", "BR")
+f_dt_mat <- t(as.matrix(f_dt$value))
+
+Mat_L <- Prod_dt <- MRIO[["L"]]
+Mat_L_mat <- as.matrix(Mat_L)
+
+Matrice_Empreinte <- CFPcalculationRCPP(f_dt_mat, Mat_L_mat, DF_FRA_mat) # Real footprint (full layers)
+Tot_Matrice_Empreinte <- sum(Matrice_Empreinte, na.rm = T)
+print(paste0("real footprint : ", Tot_Matrice_Empreinte))
+
+Mat_A <- as.matrix(MRIO[["A_tab"]][, 4:ncol(MRIO[["A_tab"]])])
+Mat_A2 <- Mult2_rcpp3(Mat_A, Mat_A)
+Mat_A3 <- Mult2_rcpp3(Mat_A2, Mat_A)
+Mat_A4 <- Mult2_rcpp3(Mat_A3, Mat_A)
+Mat_A5 <- Mult2_rcpp3(Mat_A4, Mat_A)
+Mat_A6 <- Mult2_rcpp3(Mat_A5, Mat_A)
+Mat_A7 <- Mult2_rcpp3(Mat_A6, Mat_A)
+
+Mat_A_partiel <- diag(ncol(Mat_A)) + Mat_A + Mat_A2 + Mat_A3 + Mat_A4 + Mat_A5 + Mat_A6 + Mat_A7
+Matrice_Empreinte_partielle <- CFPcalculationRCPP(f_dt, Mat_A_partiel, DF_FRA_mat)
+Tot_Matrice_Empreinte_partielle <- sum(Matrice_Empreinte_partielle, na.rm = T)
+print(paste0("partial footprint (7 layers): ", Tot_Matrice_Empreinte_partielle))
+
+Taux_Layer7 <- Tot_Matrice_Empreinte_partielle / Tot_Matrice_Empreinte
+print(paste0("rate partial footprint (7 layers): ", Taux_Layer4))
+
+###############################################
+
+Mat_A_L0 <- diag(ncol(Mat_A))
+Matrice_Empreinte_partielle0 <- CFPcalculationRCPP(f_dt_mat, Mat_A_L0, DF_FRA_mat)
+Tot_Matrice_Empreinte_partielle_L0 <- sum(Matrice_Empreinte_partielle0, na.rm = T)
+Taux_L0 <- Tot_Matrice_Empreinte_partielle_L0 / Tot_Matrice_Empreinte
+
+Mat_A_L1 <- Mat_A
+Matrice_Empreinte_partielle1 <- CFPcalculationRCPP(f_dt_mat, Mat_A_L1, DF_FRA_mat)
+Tot_Matrice_Empreinte_partielle_L1 <- sum(Matrice_Empreinte_partielle1, na.rm = T)
+Taux_L1 <- Tot_Matrice_Empreinte_partielle_L1 / Tot_Matrice_Empreinte
+
+Mat_A_L2 <- Mat_A2
+Matrice_Empreinte_partielle2 <- CFPcalculationRCPP(f_dt_mat, Mat_A_L2, DF_FRA_mat)
+Tot_Matrice_Empreinte_partielle_L2 <- sum(Matrice_Empreinte_partielle2, na.rm = T)
+Taux_L2 <- Tot_Matrice_Empreinte_partielle_L2 / Tot_Matrice_Empreinte
+
+Mat_A_L3 <- Mat_A3
+Matrice_Empreinte_partielle3 <- CFPcalculationRCPP(f_dt_mat, Mat_A_L3, DF_FRA_mat)
+Tot_Matrice_Empreinte_partielle_L3 <- sum(Matrice_Empreinte_partielle3, na.rm = T)
+Taux_L3 <- Tot_Matrice_Empreinte_partielle_L3 / Tot_Matrice_Empreinte
+
+Mat_A_L4 <- Mat_A4
+Matrice_Empreinte_partielle4 <- CFPcalculationRCPP(f_dt_mat, Mat_A_L4, DF_FRA_mat)
+Tot_Matrice_Empreinte_partielle_L4 <- sum(Matrice_Empreinte_partielle4, na.rm = T)
+Taux_L4 <- Tot_Matrice_Empreinte_partielle_L4 / Tot_Matrice_Empreinte
+
+Mat_A_L5 <- Mat_A5
+Matrice_Empreinte_partielle5 <- CFPcalculationRCPP(f_dt_mat, Mat_A_L5, DF_FRA_mat)
+Tot_Matrice_Empreinte_partielle_L5 <- sum(Matrice_Empreinte_partielle5, na.rm = T)
+Taux_L5 <- Tot_Matrice_Empreinte_partielle_L5 / Tot_Matrice_Empreinte
+
+Mat_A_L6 <- Mat_A6
+Matrice_Empreinte_partielle6 <- CFPcalculationRCPP(f_dt_mat, Mat_A_L6, DF_FRA_mat)
+Tot_Matrice_Empreinte_partielle_L6 <- sum(Matrice_Empreinte_partielle6, na.rm = T)
+Taux_L6 <- Tot_Matrice_Empreinte_partielle_L6 / Tot_Matrice_Empreinte
+
+Mat_A_L7 <- Mat_A7
+Matrice_Empreinte_partielle7 <- CFPcalculationRCPP(f_dt_mat, Mat_A_L7, DF_FRA_mat)
+Tot_Matrice_Empreinte_partielle_L7 <- sum(Matrice_Empreinte_partielle7, na.rm = T)
+Taux_L7 <- Tot_Matrice_Empreinte_partielle_L7 / Tot_Matrice_Empreinte
+
+Taux_L0to7 <- Taux_L0 + Taux_L1 + Taux_L2 + Taux_L3 + Taux_L4 + Taux_L5 + Taux_L6 + Taux_L7
+
+print(paste0("Taux LO : ", Taux_L0)) # VA :  57,0%      in 2019     Emi : 24,7%
+print(paste0("Taux L1 : ", Taux_L1)) # VA :  19,9%                  Emi : 24,7%
+print(paste0("Taux L2 : ", Taux_L2)) # VA :  10,6%                  Emi : 18,3%
+print(paste0("Taux L3 : ", Taux_L3)) # VA :  5,7%                  Emi : 12,3%
+print(paste0("Taux L4 : ", Taux_L4)) # VA :  3,1%                  Emi : 7,8%
+print(paste0("Taux L5 : ", Taux_L5)) # VA :  1,7%                  Emi : 4,8%
+print(paste0("Taux L6 : ", Taux_L6)) # VA :  0,9%                  Emi : 2,9%
+print(paste0("Taux L7 : ", Taux_L7)) # VA :  0,5%                  Emi : 1,7%
+print(paste0("Taux L0-7 : ", Taux_L0to7)) # VA : 99,4%               Emi : 97,4%
+
+##############################
+
+List_matLayers <- list(M_L0 = Matrice_Empreinte_partielle0, M_L1 = Matrice_Empreinte_partielle1, M_L2 = Matrice_Empreinte_partielle2, M_L3 = Matrice_Empreinte_partielle3, M_L4 = Matrice_Empreinte_partielle4, M_L5 = Matrice_Empreinte_partielle5, M_L6 = Matrice_Empreinte_partielle6, M_L7 = Matrice_Empreinte_partielle7)
+saveRDS(List_matLayers, "List_matLayers")
+```
+
+
+#Path analysis on carbon footprint
+
+```{r}
+seuil <- 0.02 # OK 1025 sec
+ListThres_Tests <- list(GenThres = seuil, Thres_L2_1 = seuil, Thres_L3_1 = seuil, Thres_L3_2 = seuil, Thres_L3_3 = seuil, Thres_L3_4 = seuil, Thres_L4_1 = seuil, Thres_L4_2 = seuil, Thres_L4_3 = seuil, Thres_L4_4 = seuil, Thres_L5_1 = seuil, Thres_L5_2 = seuil, Thres_L5_3 = seuil, Thres_L5_4 = seuil, Thres_L6_1 = seuil, Thres_L6_2 = seuil, Thres_L6_3 = seuil, Thres_L6_4 = seuil, Thres_L7_1 = seuil, Thres_L7_2 = seuil, Thres_L7_3 = seuil, Thres_L7_4 = seuil)
+
+SPA_test <- av_SPA(dtdl, Optdl = FALSE, TypeSPA = "Emi", TypeMRIO = "FIGARO", ListThres = ListThres_Tests, TargetCountry = "FRA", OptRDS = "", OptRDSDetail = "", OptUE27 = FALSE, verbose = TRUE, PathEmi = PathTemp)
+SPA_test <- SPA_test[order(-Pathvalue)]
+
+# Doesn't work with these parameters : only work at INSEE under AUS remote computing
+# SPA_Emi_FIG<-av_SPA(dtdl,Optdl=FALSE,TypeSPA="Emi",TypeMRIO="FIGARO",ListThres=ListThres_Emi_FIG,TargetCountry="FRA",OptRDS="",OptRDSDetail="",OptUE27=FALSE,verbose=TRUE,PathEmi=PathTemp
+```
+
+
+#Path analysis on value added
+
+```{r}
+seuil <- 0.1
+ListThres_Tests <- list(GenThres = seuil, Thres_L2_1 = seuil, Thres_L3_1 = seuil, Thres_L3_2 = seuil, Thres_L3_3 = seuil, Thres_L3_4 = seuil, Thres_L4_1 = seuil, Thres_L4_2 = seuil, Thres_L4_3 = seuil, Thres_L4_4 = seuil, Thres_L5_1 = seuil, Thres_L5_2 = seuil, Thres_L5_3 = seuil, Thres_L5_4 = seuil, Thres_L6_1 = seuil, Thres_L6_2 = seuil, Thres_L6_3 = seuil, Thres_L6_4 = seuil, Thres_L7_1 = seuil, Thres_L7_2 = seuil, Thres_L7_3 = seuil, Thres_L7_4 = seuil)
+
+SPA_test <- av_SPA(dtdl, Optdl = FALSE, TypeSPA = "VA", TypeMRIO = "FIGARO", ListThres = ListThres_Tests, TargetCountry = "FRA", OptRDS = "", OptRDSDetail = "", OptUE27 = FALSE, verbose = TRUE)
+SPA_test <- SPA_test[order(-Pathvalue)]
+
+# Doesn't work with these parameters : only work at INSEE under AUS remote computing
+# SPA_VA_FIG<-av_SPA(dtdl,Optdl=FALSE,TypeSPA="VA",TypeMRIO="FIGARO",ListThres=ListThres_VA_FIG,TargetCountry="FRA",OptRDS="",OptRDSDetail="",OptUE27=FALSE,verbose=TRUE)
+```
+
+##Example of use on agri-food industries with Spanish variant
+Answer to the question : what happens when we switch 1 billion importations of agri-food industries from Spania to French output ?
+
+```{r}
+MRIOdep <- readRDS(paste0(PathTest, "HRMwide_C10T12_100MoE.rds"))
+
+# Loading reference MRIO
+BASE_FIG <- readRDS(paste0(PathTemp, "BDn_FIG.rds"))
+BASE_FIG <- SommeDFenP3_S14(BASE_FIG[year == 2019, ])
+
+# Variant with substitution only with Spain
+IndusREF <- "C10T12"
+Pct_Attrib_IndusREF <- Attr_TxSimu_HRM_100MoE(IndusREF, "FRA", 2019, TypeTx = "VA", OptSourceRDS = "XXXXX", OptMRIOlong = BASE_FIG2019)
+
+interm <- av_HRM(BASE_FIG2019, "FRA", IndusREF, Pct_Attrib_IndusREF, verboseCheck = TRUE, OptSommeDFenP3_S14 = TRUE, OptVarianteDemande = "ALL", OptVariantePaysImp = "ESP", OptBaseIntermAvantRecalcProd = FALSE)
+
+base_long_interm <- interm[["HRM_Base"]]
+base_wide_interm <- CompoMRIO(SommeDFenP3_S14(base_long_interm), typeCompo = "OptFullOptionsBonus", date = 2019)
+MRIO2_interm <- av_extend_MRIO_dw(MRIO_dw = base_wide_interm, "FIGARO", TypExtension = "StressVA")
+MRIO3_interm <- av_extend_MRIO_dw(MRIO_dw = MRIO2_interm, "FIGARO", TypExtension = "StressEmi", Path1 = PathTemp)
+MRIO3_interm[["EmiOverOuput"]] <- MRIOdep[["EmiOverOuput"]] # Be careful : we need to keep initial Emi / Ouptut because Ouput is recalculated by HRM and emissions does not fit this new output but initial one.
+saveRDS(base_long_interm, paste0(PathTest, "HRMlong_", IndusREF, "_100MoE_VariantESP.rds"))
+saveRDS(MRIO3_interm, paste0(PathTest, "HRMwide_", IndusREF, "_100MoE_VariantESP.rds"))
+
+MRIO_ESP <- MRIO3_interm
+
+# Tables useful for SPA
+MRIOdt_REF <- BASE_FIG[year == 2019, ]
+MRIOdt_bis <- dw_to_dl(readRDS(paste0(PathTest, "HRMwide_C10T12_100MoE.rds")))
+MRIOdt_esp <- base_long_interm
+
+
+
+# SPA VA
+seuil <- 0.05
+ListThres <- list(GenThres = seuil, Thres_L2_1 = seuil, Thres_L3_1 = seuil, Thres_L3_2 = seuil, Thres_L3_3 = seuil, Thres_L3_4 = seuil, Thres_L4_1 = seuil, Thres_L4_2 = seuil, Thres_L4_3 = seuil, Thres_L4_4 = seuil, Thres_L5_1 = seuil, Thres_L5_2 = seuil, Thres_L5_3 = seuil, Thres_L5_4 = seuil, Thres_L6_1 = seuil, Thres_L6_2 = seuil, Thres_L6_3 = seuil, Thres_L6_4 = seuil, Thres_L7_1 = seuil, Thres_L7_2 = seuil, Thres_L7_3 = seuil, Thres_L7_4 = seuil)
+
+Diff_std_VA <- av_Diff_SPA(MRIOdt_REF, MRIOdt_bis, ListThres, TypContenu = "VA")
+Diff_esp_VA <- av_Diff_SPA(MRIOdt_REF, MRIOdt_esp, ListThres, TypContenu = "VA")
+
+
+# SPA Emissions
+seuil <- 0.05
+ListThres <- list(GenThres = seuil, Thres_L2_1 = seuil, Thres_L3_1 = seuil, Thres_L3_2 = seuil, Thres_L3_3 = seuil, Thres_L3_4 = seuil, Thres_L4_1 = seuil, Thres_L4_2 = seuil, Thres_L4_3 = seuil, Thres_L4_4 = seuil, Thres_L5_1 = seuil, Thres_L5_2 = seuil, Thres_L5_3 = seuil, Thres_L5_4 = seuil, Thres_L6_1 = seuil, Thres_L6_2 = seuil, Thres_L6_3 = seuil, Thres_L6_4 = seuil, Thres_L7_1 = seuil, Thres_L7_2 = seuil, Thres_L7_3 = seuil, Thres_L7_4 = seuil)
+
+Diff_std_Emi <- av_Diff_SPA(MRIOdt_REF, MRIOdt_bis, ListThres, TypContenu = "Emi", PathEmi = PathTemp)
+Diff_esp_Emi <- av_Diff_SPA(MRIOdt_REF, MRIOdt_esp, ListThres, TypContenu = "Emi", PathEmi = PathTemp)
+
+# SaveRDS
+saveRDS(Diff_std_VA, "Diff_std_VA.rds")
+saveRDS(Diff_esp_VA, "Diff_esp_VA.rds")
+saveRDS(Diff_std_Emi, "Diff_std_Emi.rds")
+saveRDS(Diff_esp_Emi, "Diff_esp_Emi.rds")
+
+################################################
+### Outputs
+
+# Loading Path databases
+Diff_std_VA <- readRDS("Diff_std_VA.rds")
+Diff_esp_VA <- readRDS("Diff_esp_VA.rds")
+Diff_std_Emi <- readRDS("Diff_std_Emi.rds")
+Diff_esp_Emi <- readRDS("Diff_esp_Emi.rds")
+
+print(sum(Diff_std_VA$diffValue))
+print(sum(Diff_esp_VA$diffValue))
+print(sum(Diff_std_Emi$diffValue))
+print(sum(Diff_esp_Emi$diffValue))
+
+print(sum(Diff_std_VA$Pathvalue))
+print(sum(Diff_esp_VA$Pathvalue))
+print(sum(Diff_std_Emi$Pathvalue))
+print(sum(Diff_esp_Emi$Pathvalue))
+
+Diff_std_VA <- Diff_std_VA[, diffValue := 10 * diffValue]
+Diff_esp_VA <- Diff_esp_VA[, diffValue := 10 * diffValue]
+
+# Choice of the Path
+
+MonPass_sorted <- Diff_esp_Emi ### Here choose the variant
+
+MonPass_sorted <- MonPass_sorted[, c("deb", "fin", "path", "Pathvalue", "diffValue")]
+
+# Selection of data for tests or real
+# Path<-MonPass_sorted
+Path <- MonPass_sorted[1:500000, ]
+
+# Data manipulation
+Path$deb_pays <- str_extract(Path$deb, "[^_]+")
+Path$deb_Indus <- substring(str_extract(Path$deb, "_.+$"), 2)
+Path$fin_pays <- str_extract(Path$fin, "[^_]+")
+Path$fin_Indus <- substring(str_extract(Path$fin, "_.+$"), 2)
+
+# Main path differences for the footprint of a given product, for example in the accommodation-restaurant sector: when you go to a restaurant, what does it change in terms of VA and emissions if we produce more LPG in France and import less from Spain in return ?
+Path_resto <- Path[fin_Indus == "I", ]
+Path_resto_IMP <- Path[fin_Indus == "I" & deb_pays != "FRA", ]
+Path_resto_FRA <- Path[fin_Indus == "I" & deb_pays == "FRA", ]
+
+write.xlsx(Path_resto[1:500, ], "Spa_IAA_Resto.xlsx", sheetName = "tous", col.names = TRUE, row.names = TRUE)
+write.xlsx(Path_resto_IMP[1:500, ], "Spa_IAA_Resto.xlsx", sheetName = "IMP", col.names = TRUE, row.names = TRUE, append = TRUE)
+
+# On Paths starting abroad
+
+ligne <- 2
+Desc <- paste0("initialement ", round(Path_resto_IMP[ligne, "Pathvalue"], 2), " vient de ", Path_resto_IMP[ligne, "deb"], " et arrive dans la demande finale Française en produit ", Path_resto_IMP[ligne, "fin_Indus"], " en passant par ", Path_resto_IMP[ligne, "path"], " : ce montant est revu de ", round(Path_resto_IMP[ligne, "diffValue"], 2), " dans cette variante")
+print(Desc)
+
+# On Paths starting out in France
+
+ligne <- 2
+Desc <- paste0("initialement ", round(Path_resto_FRA[ligne, "Pathvalue"], 2), " vient de ", Path_resto_FRA[ligne, "deb"], " et arrive dans la demande finale Française en produit ", Path_resto_FRA[ligne, "fin_Indus"], " en passant par ", Path_resto_FRA[ligne, "path"], " : ce montant est revu de ", round(Path_resto_FRA[ligne, "diffValue"], 2), " dans cette variante")
+print(Desc)
+
+# Variant deviations by country of origin
+Empr_imp_bycountry <- Path[deb_pays != "FRA", sum(diffValue), by = c("deb_pays")]
+Empr_imp_bycountry <- Empr_imp_bycountry[order(-abs(V1))]
+Empr_imp_bycountry_resto <- Path_resto[deb_pays != "FRA", sum(diffValue), by = c("deb_pays")]
+Empr_imp_bycountry_resto <- Empr_imp_bycountry_resto[order(-abs(V1))]
+
+# Variant deviations by branch of origin
+Empr_imp_byindus <- Path[deb_pays != "FRA", sum(diffValue), by = c("deb_Indus")]
+Empr_imp_byindus <- Empr_imp_byindus[order(-abs(V1))]
+Empr_imp_byindus_resto <- Path_resto[deb_pays != "FRA", sum(diffValue), by = c("deb_Indus")]
+Empr_imp_byindus_resto <- Empr_imp_byindus_resto[order(-abs(V1))]
+
+# Identify the main gaps in the routes that leave France, return to France, and pass through other countries (what weight do these represent in the footprint?).
+List_paysHorsFRA <- unique(Path[fin_pays != "FRA", paste0(fin_pays, "_")])
+List_paysHorsFRAun <- unlist(List_paysHorsFRA)
+Paths_FRAFRA <- Path[deb_pays == "FRA" & fin_pays == "FRA", ] # Selection 1 : FRA -> FRA
+Paths_FRA_x_FRA <- Paths_FRAFRA %>%
+  filter(str_detect(Paths_FRAFRA$path, paste(List_paysHorsFRAun, collapse = "|"))) # Selection 2 : paths that take you abroad
+print(sum(Paths_FRA_x_FRA$Pathvalue) / sum(MonPass_sorted$Pathvalue)) # Proportion (in %) of paths passing through foreign countries before returning to France
+```

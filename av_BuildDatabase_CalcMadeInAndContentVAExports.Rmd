@@ -1,0 +1,761 @@
+---
+title: "Build databases and calculation of Made-In indicators (and content of VA in exports)"
+output: html_notebook
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  eval = FALSE,
+  echo = TRUE
+)
+```
+
+#0. Introduction
+
+In this notebook we will build normalized database and after we will use them to calculate made-in indicators. We will reproduce figures and graphics of the working paper.
+
+4 MRIO are used in this study (FIGARO Rel.2022, LR-WIOD Rel. 2022, WIOD Rel.2016, ICIO rel. 2021). All raw databases are available online. The first step is to normalize these data in the same format. Then it is possible to apply the same Avionic2 functions to these different databases.
+
+Raw data links :
+- Figaro 2022 release, CSV flat format : link : [Figaro 2022 link](https://ec.europa.eu/eurostat/web/esa-supply-use-input-tables/database#CSV%20flat%20format%20(FIGARO%202022%20edition))
+- LR-WIOD 2022 release : link : [LR-WIOD 2022 link](https://www.rug.nl/ggdc/valuechain/long-run-wiod?lang=en)
+License and funding : Long-run WIOD is licensed under a Creative Commons Attribution 4.0 International License . The construction of the Long-run WIOD was supported by the Dutch Science Foundation (NWO) [grant number 453-14-012].
+- WIOD 2016 release, RData format : link : [WIOD 2016 link](https://www.rug.nl/ggdc/valuechain/wiod/wiod-2016-release?lang=en)
+Article : Timmer, M. P., Dietzenbacher, E., Los, B., Stehrer, R. and de Vries, G. J. (2015), "An Illustrated User Guide to the World Input–Output Database: the Case of Global Automotive Production" , Review of International Economics., 23: 575–605
+- ICIO 2021 release, CSV flat format : link : [ICIO 2021 link](https://www.oecd.org/industry/ind/inter-country-input-output-tables.htm)
+Credits : OECD (2021), OECD Inter-Country Input-Output Database, [ICIO informations](http://oe.cd/icio)
+
+
+
+
+#1. Build normalized databases from raw data.
+
+During testing, we realized that depending on the power of the machine running Avionic2 codes, there could be limitations: some functions could not load large databases. In order to make these codes available to all users, whatever their hardware configuration, we decided to offer 2 options:
+  1/ Build a single database for each MRIO, which requires more power for loading/processing, but has the advantage of storing/managing a limited number of files.
+  2/ Build one database per year for each MRIO, which limits the memory required to load/process data, but multiplies the number of databases stored.
+
+Some bases are initially denominated in dollars, so an option has been created to convert these bases into euros in order to standardize valuations.
+
+```{r}
+## Path
+PathTest<-getwd( )  # "C:/Users/SJOITL/Desktop/temporaire/test/"
+PathTemp<-getwd( )  # "C:/Users/SJOITL/Desktop/temporaire/"
+
+# Assign Paths
+MyPathFIGARO <- paste0(PathTemp, "ixi/")
+MyPathFIGARO_out <- PathTest
+MyPathWIODLR <- PathTemp
+MyPathWIODLR_out <- PathTest
+MyPathWIOD <- PathTemp
+MyPathWIOD_out <- PathTest
+MyPathICIO <- PathTemp
+MyPathICIO_out <- PathTest
+
+# Choose the lines to launch according to your option's preferences
+
+# Normalize MRIO FIGARO
+Path_FIG22ixi <- MyPathFIGARO
+Path_out <- MyPathFIGARO_out
+# Annual database option
+av_create_FIGAROixi_2022(Path_FIG22ixi, Path_out, OptAnnual = TRUE)
+# Unique database for all years option
+av_create_FIGAROixi_2022(Path_FIG22ixi, Path_out, OptAnnual = FALSE)
+
+# Normalize MRIO LR-WIOD (unique database only as it has limited size, and raw data is also a unique database)
+Path_WIODLR <- MyPathWIODLR
+Path_out <- MyPathWIODLR_out
+# Euro calculation option
+av_create_LRWIOD_2022(Path_WIODLR, Path_out, ConvertToEuro = TRUE)
+# keep dollars option
+av_create_LRWIOD_2022(Path_WIODLR, Path_out, ConvertToEuro = FALSE)
+
+# Normalize MRIO WIOD
+Path_WIOD <- MyPathWIOD
+Path_out <- MyPathWIOD_out
+# Annual database option + Euro calculation option
+av_create_WIOD_2016(Path_WIOD, Path_out, OptAnnual = TRUE, ConvertToEuro = TRUE)
+# Annual database option + keep dollars option
+av_create_WIOD_2016(Path_WIOD, Path_out, OptAnnual = TRUE, ConvertToEuro = FALSE)
+# Unique database for all years option + Euro calculation option
+av_create_WIOD_2016(Path_WIOD, Path_out, OptAnnual = FALSE, ConvertToEuro = TRUE)
+# Unique database for all years option + keep dollars option
+av_create_WIOD_2016(Path_WIOD, Path_out, OptAnnual = FALSE, ConvertToEuro = FALSE)
+
+# Normalize MRIO ICIO
+Path_ICIO <- MyPathICIO
+Path_out <- MyPathICIO_out
+# Annual database option + Euro calculation option
+av_create_ICIO_2021(Path_ICIO, Path_out, OptAnnual = TRUE, ConvertToEuro = TRUE)
+# Annual database option + keep dollars option
+av_create_ICIO_2021(Path_ICIO, Path_out, OptAnnual = TRUE, ConvertToEuro = FALSE)
+# Unique database for all years option + Euro calculation option
+av_create_ICIO_2021(Path_ICIO, Path_out, OptAnnual = FALSE, ConvertToEuro = TRUE)
+# Unique database for all years option + keep dollars option
+av_create_ICIO_2021(Path_ICIO, Path_out, OptAnnual = FALSE, ConvertToEuro = FALSE)
+
+# You can check that each database created has the same variable names.
+```
+
+UE27 aggregation :
+
+A function is available to convert these databases into an aggregated version, where each of the 27 EU countries is aggregated into an EU27 item. These bases are necessary to calculate the made-in of EU27 (which cannot be aggregated a posteriori to the made-in calculations of each country.
+This function only works with normalized data (see last chunk)
+
+Note that UE27 aggregated MRIO are smaller than non-aggregated, therefore unique database can be used even if non-aggregated are annual databases.
+
+```{r}
+# Example for FIGARO MRIO (easy to change to others)
+
+MyPathFIGARO <- PathTest
+PathFIGARO_out <- PathTest
+
+# Choose the lines to launch according to your option's preferences
+
+# Annual database option
+# Case where UE27 databases are also annual
+for (k in 2010:2020) {
+  MyDl <- readRDS(paste0(MyPathFIGARO, "/BDn_FIG_", k, ".rds"))
+  MyDlUE27 <- av_dl_UE27(MyDl, OptSaveRDS = paste0(PathFIGARO_out, "/BDn_FIG_", k, "_UE27"))
+}
+# Case where UE27 databases become a unique database for all years
+for (k in 2010:2020) {
+  MyDl <- readRDS(paste0(MyPathFIGARO, "/BDn_FIG_", k, ".rds"))
+  MyDlUE27 <- av_dl_UE27(MyDl, OptSaveRDS = "NO")
+  if (k == 2010) {
+    MyDlUE27_ALL <- MyDlUE27
+  } else {
+    MyDlUE27_ALL <- rbind(MyDlUE27_ALL, MyDlUE27)
+  }
+}
+saveRDS(MyDlUE27_ALL, paste0(PathFIGARO_out, "/BDn_FIG_UE27"))
+
+# Unique database for all years option
+MyDl <- readRDS(paste0(MyPathFIGARO, "/BDn_FIG.rds"))
+MyDlUE27 <- av_dl_UE27(MyDl, OptSaveRDS = "NO") # No RDS saved
+MyDlUE27 <- av_dl_UE27(MyDl, OptSaveRDS = paste0(PathFIGARO_out, "/BDn_FIG_UE27")) # With RDS saved
+```
+
+
+At this step, you have normalized data, therefore you can use Avionic2 functions.
+
+We show below one of the main function that identify each component of a MRIO (function CompoMRIO) and can add extensions like carbon emissions.
+
+Note : These code are used intermediary but are not necessary to reproduce working paper illustrations
+```{r}
+# Example with FIGARO data in 2010 (can easily be subset from the unique database for all years if necessary)
+
+DT <- readRDS(paste0(PathTest, "BDn_FIG_2010.rds"))
+
+# Build the components of MRIO
+MRIO_FIG_2010 <- CompoMRIO(DT, typeCompo = "OptFullOptionsBonus", OptTab = FALSE)
+
+# You can also access quickly to each component
+Output <- CompoMRIO(DT, typeCompo = "PROD")
+TechCoeff <- CompoMRIO(DT, typeCompo = "A", OptTab = TRUE)
+TechCoeff2 <- CompoMRIO(DT, typeCompo = "A", OptTab = FALSE) # As a long format and not wide
+FinDemand <- CompoMRIO(DT, typeCompo = "DF_TOT", OptTab = FALSE)
+VA <- CompoMRIO(DT, typeCompo = "VA", OptTab = FALSE)
+
+# You can add extensions
+MRIO2 <- av_extend_MRIO_dw(MRIO_dw = MRIO_FIG_2010, "FIGARO", TypExtension = "StressVA") # Stressor Value Added
+MRIO3 <- av_extend_MRIO_dw(MRIO_dw = MRIO_FIG_2010, "FIGARO", TypExtension = "StressEmi", Path1 = PathTemp) # Stressor CO2 Emissions
+```
+
+We also show below how you can calculate content of value added embedded in final demand, and you can calculate footprints.
+
+Note : These code are used intermediary but are not necessary to reproduce working paper illustrations
+```{r}
+# Example with FIGARO data in 2010 (can easily be subset from the unique database for all years if necessary)
+
+DT <- readRDS(paste0(PathTest, "BDn_FIG_2010.rds"))
+
+# Build the components of MRIO and add VA and CO2 emissions stressors
+MRIO_FIG_2010 <- CompoMRIO(DT, typeCompo = "OptFullOptionsBonus", OptTab = FALSE)
+MRIO_FIG_2010_ext <- av_extend_MRIO_dw(MRIO_dw = MRIO_FIG_2010, "FIGARO", TypExtension = "StressEmi", Path1 = PathTemp) # Stressor CO2 Emissions
+MRIO_FIG_2010_ext <- av_extend_MRIO_dw(MRIO_dw = MRIO_FIG_2010_ext, "FIGARO", TypExtension = "StressVA", Path1 = PathTemp) # Stressor Value Added
+
+# Calculation of contents embedded in final demand, for France
+ContentVA <- Contenus(MRIO_FIG_2010_ext, "VA", MethContenu = "MatDF", EmprPays = "FRA")
+ContentEmi <- Contenus(MRIO_FIG_2010_ext, "Emi", MethContenu = "MatDF", EmprPays = "FRA")
+
+# Calculation of footprints (content embedded in final demand as a matrix), for France
+FootprintVA <- Contenus(MRIO_FIG_2010_ext, "VA", MethContenu = "DiagDFpays", EmprPays = "FRA")
+FootprintEmi <- Contenus(MRIO_FIG_2010_ext, "Emi", MethContenu = "DiagDFpays", EmprPays = "FRA")
+
+# Check that sums of production approach is the same that sums of consumption approach (usually called footprint)
+print(sum(EmpreinteVA[["Empreinte_Conso"]]))
+print(sum(EmpreinteVA[["Empreinte_Production"]]))
+
+print(sum(EmpreinteEmi[["Empreinte_Conso"]]))
+print(sum(EmpreinteEmi[["Empreinte_Production"]]))
+```
+
+
+
+#2. Calculation of Made-In indicators and content of VA embedded in exports.
+
+
+
+We need to build indicators databases before plotting and so on.
+
+We distinguish the case of a single database for each MRIO, and the case of one database per year for each MRIO.
+
+Here is the example of FIGARO MRIO, but easy to adapt to others.
+```{r}
+##### MADE-IN indicators
+
+### Annual database option
+
+# loading of individual databases.
+FIG2010 <- readRDS(paste0(PathTest, "BDn_FIG_2010.rds"))
+FIG2011 <- readRDS(paste0(PathTest, "BDn_FIG_2011.rds"))
+FIG2012 <- readRDS(paste0(PathTest, "BDn_FIG_2012.rds"))
+FIG2013 <- readRDS(paste0(PathTest, "BDn_FIG_2013.rds"))
+FIG2014 <- readRDS(paste0(PathTest, "BDn_FIG_2014.rds"))
+FIG2015 <- readRDS(paste0(PathTest, "BDn_FIG_2015.rds"))
+FIG2016 <- readRDS(paste0(PathTest, "BDn_FIG_2016.rds"))
+FIG2017 <- readRDS(paste0(PathTest, "BDn_FIG_2017.rds"))
+FIG2018 <- readRDS(paste0(PathTest, "BDn_FIG_2018.rds"))
+FIG2019 <- readRDS(paste0(PathTest, "BDn_FIG_2019.rds"))
+FIG2020 <- readRDS(paste0(PathTest, "BDn_FIG_2010.rds"))
+
+ListFIG <- list(FIG2010, FIG2011, FIG2012, FIG2013, FIG2014, FIG2015, FIG2016, FIG2017, FIG2018, FIG2019, FIG2020)
+
+UE27_FIG2010 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2010.rds"))
+UE27_FIG2011 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2011.rds"))
+UE27_FIG2012 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2012.rds"))
+UE27_FIG2013 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2013.rds"))
+UE27_FIG2014 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2014.rds"))
+UE27_FIG2015 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2015.rds"))
+UE27_FIG2016 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2016.rds"))
+UE27_FIG2017 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2017.rds"))
+UE27_FIG2018 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2018.rds"))
+UE27_FIG2019 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2019.rds"))
+UE27_FIG2020 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2010.rds"))
+
+ListUE27_FIG <- list(UE27_FIG2010, UE27_FIG2011, UE27_FIG2012, UE27_FIG2013, UE27_FIG2014, UE27_FIG2015, UE27_FIG2016, UE27_FIG2017, UE27_FIG2018, UE27_FIG2019, UE27_FIG2020)
+
+BaseFIG <- FIG2020 # not used here, just to fill parameters
+
+# Option with rates results only
+MadeInFIG_rates <- BoucleAnneesMADEINs(BaseFIG, Optdl = TRUE, 2010:2020, OptDonneesBrutes = FALSE, OptAnnual = TRUE, ListdlAnnual = ListFIG)
+saveRDS(MadeInFIG_rates, "MadeInFIG_rates.rds")
+# Option with levels (numerator and denominator) often useful for manipulations
+MadeInFIG_levels <- BoucleAnneesMADEINs(BaseFIG, Optdl = TRUE, 2010:2020, OptDonneesBrutes = TRUE, OptAnnual = TRUE, ListdlAnnual = ListFIG)
+saveRDS(MadeInFIG_levels, "MadeInFIG_levels.rds")
+
+## Calculation for EU27 : be careful the calculation cannot be done by only agregating, you need to apply functions to EU27 format data.
+
+BaseFIG <- FIG2020 # not used here, just to fill parameters
+
+# Option with rates results only
+MadeInFIG_rates <- BoucleAnneesMADEINs(BaseFIG, Optdl = TRUE, 2010:2020, OptDonneesBrutes = FALSE, OptAnnual = TRUE, ListdlAnnual = ListUE27_FIG)
+saveRDS(MadeInFIG_rates, "MadeInFIG_rates_UE27.rds")
+# Option with levels (numerator and denominator) often useful for manipulations
+MadeInFIG_levels <- BoucleAnneesMADEINs(BaseFIG, Optdl = TRUE, 2010:2020, OptDonneesBrutes = TRUE, OptAnnual = TRUE, ListdlAnnual = ListUE27_FIG)
+saveRDS(MadeInFIG_levels, "MadeInFIG_levels_UE27.rds")
+
+
+### Unique database for all years option
+
+# loading of the full database.
+BaseFIG <- readRDS(paste0(PathTest, "BDn_FIG.rds"))
+
+# Option with rates results only
+MadeInFIG_rates <- BoucleAnneesMADEINs(BaseFIG, Optdl = TRUE, 2010:2020, OptDonneesBrutes = FALSE, OptAnnual = FALSE)
+saveRDS(MadeInFIG_rates, "MadeInFIG_rates.rds")
+# Option with levels (numerator and denominator) often useful for manipulations
+MadeInFIG_levels <- BoucleAnneesMADEINs(BaseFIG, Optdl = TRUE, 2010:2020, OptDonneesBrutes = TRUE, OptAnnual = FALSE)
+saveRDS(MadeInFIG_levels, "MadeInFIG_levels.rds")
+
+## Calculation for EU27 : be careful the calculation cannot be done by only agregating, you need to apply functions to EU27 format data.
+
+# loading of the full database.
+BaseFIG_UE27 <- readRDS(paste0(PathTest, "BDn_FIG_UE27.rds"))
+
+# Option with rates results only
+MadeInFIG_rates <- BoucleAnneesMADEINs(BaseFIG_UE27, Optdl = TRUE, 2010:2020, OptDonneesBrutes = FALSE, OptAnnual = FALSE)
+saveRDS(MadeInFIG_rates, "MadeInFIG_rates_UE27.rds")
+# Option with levels (numerator and denominator) often useful for manipulations
+MadeInFIG_levels <- BoucleAnneesMADEINs(BaseFIG_UE27, Optdl = TRUE, 2010:2020, OptDonneesBrutes = TRUE, OptAnnual = FALSE)
+saveRDS(MadeInFIG_levels, "MadeInFIG_levels_UE27.rds")
+
+
+##### CONTENT OF VA EMBEDDED IN EXPORTS
+
+### Annual database option
+
+# loading of individual databases.
+FIG2010 <- readRDS(paste0(PathTest, "BDn_FIG_2010.rds"))
+FIG2011 <- readRDS(paste0(PathTest, "BDn_FIG_2011.rds"))
+FIG2012 <- readRDS(paste0(PathTest, "BDn_FIG_2012.rds"))
+FIG2013 <- readRDS(paste0(PathTest, "BDn_FIG_2013.rds"))
+FIG2014 <- readRDS(paste0(PathTest, "BDn_FIG_2014.rds"))
+FIG2015 <- readRDS(paste0(PathTest, "BDn_FIG_2015.rds"))
+FIG2016 <- readRDS(paste0(PathTest, "BDn_FIG_2016.rds"))
+FIG2017 <- readRDS(paste0(PathTest, "BDn_FIG_2017.rds"))
+FIG2018 <- readRDS(paste0(PathTest, "BDn_FIG_2018.rds"))
+FIG2019 <- readRDS(paste0(PathTest, "BDn_FIG_2019.rds"))
+FIG2020 <- readRDS(paste0(PathTest, "BDn_FIG_2010.rds"))
+
+ListFIG <- list(FIG2010, FIG2011, FIG2012, FIG2013, FIG2014, FIG2015, FIG2016, FIG2017, FIG2018, FIG2019, FIG2020)
+
+UE27_FIG2010 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2010.rds"))
+UE27_FIG2011 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2011.rds"))
+UE27_FIG2012 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2012.rds"))
+UE27_FIG2013 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2013.rds"))
+UE27_FIG2014 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2014.rds"))
+UE27_FIG2015 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2015.rds"))
+UE27_FIG2016 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2016.rds"))
+UE27_FIG2017 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2017.rds"))
+UE27_FIG2018 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2018.rds"))
+UE27_FIG2019 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2019.rds"))
+UE27_FIG2020 <- readRDS(paste0(PathTest, "BDn_UE27_FIG_2010.rds"))
+
+ListUE27_FIG <- list(UE27_FIG2010, UE27_FIG2011, UE27_FIG2012, UE27_FIG2013, UE27_FIG2014, UE27_FIG2015, UE27_FIG2016, UE27_FIG2017, UE27_FIG2018, UE27_FIG2019, UE27_FIG2020)
+
+List_Countries_1 <- c("FRA", "DEU", "ITA", "ESP", "GBR") # bench FRA
+List_Countries_2 <- c("UE27", "USA", "CHN", "JPN") # bench UE
+
+# Note that 3333 is not used here with these options (just for fill)
+Loop_Countries_1 <- BouclePaysEtAnneesContVAdesExports(ListUE27_FIG, Optdl = TRUE, 3333, ListCountries = List_Countries_1, OptUE27 = FALSE, OptAnnual = TRUE)
+
+Loop_Countries_2 <- BouclePaysEtAnneesContVAdesExports(ListUE27_FIG, Optdl = TRUE, 3333, ListCountries = List_Countries_2, OptUE27 = TRUE, OptAnnual = TRUE)
+
+# Save
+saveRDS(Loop_Countries_1, "ContentVAExports_FRAandnearly.rds")
+saveRDS(Loop_Countries_2, "ContentVAExports_UE27andBigAreas.rds")
+
+
+
+### Unique database for all years option
+
+# loading of the full database.
+BaseFIG <- readRDS(paste0(PathTest, "BDn_FIG.rds"))
+BaseFIG_UE27 <- readRDS(paste0(PathTest, "BDn_FIG_UE27.rds"))
+
+List_Countries_1 <- c("FRA", "DEU", "ITA", "ESP", "GBR") # bench FRA
+List_Countries_2 <- c("UE27", "USA", "CHN", "JPN") # bench UE
+
+Loop_Countries_1 <- BouclePaysEtAnneesContVAdesExports(ListUE27_FIG, Optdl = TRUE, 2010:2020, ListCountries = List_Countries_1, OptUE27 = FALSE, OptAnnual = FALSE)
+
+Loop_Countries_2 <- BouclePaysEtAnneesContVAdesExports(ListUE27_FIG, Optdl = TRUE, 2010:2020, ListCountries = List_Countries_2, OptUE27 = TRUE, OptAnnual = FALSE)
+
+# Save
+saveRDS(Loop_Countries_1, "ContentVAExports_FRAandnearly.rds")
+saveRDS(Loop_Countries_2, "ContentVAExports_UE27andBigAreas.rds")
+```
+
+##Agreggation of Manuf categories and Made-In calculation
+
+There is a function to calculate in aggregate 'Manuf' classification for each of our 4 MRIO
+```{r}
+# Data loading (results of made-in in level)
+resMadeIn_LRWIOD <- readRDS(paste0(PathTemp, "RESULT_MADEINs_LRWIOD_brut.rds"))
+resMadeIn_WIOD <- readRDS(paste0(PathTemp, "RESULT_MADEINs_WIOD_brut.rds"))
+resMadeIn_FIGARO <- readRDS(paste0(PathTemp, "RESULT_MADEINs_FIGARO_brut.rds"))
+resMadeIn_ICIO <- readRDS(paste0(PathTemp, "RESULT_MADEINs_ICIO_brut.rds"))
+
+# Calculation (and save) in Manuf classification
+MadeIn_Manuf_classif <- MadeIn_Manuf(resMadeIn_LRWIOD, resMadeIn_WIOD, resMadeIn_FIGARO, resMadeIn_ICIO, OptSaveRDS = TRUE)
+```
+
+##Made-In (with UE27 and Manuf classif) : Adjustments on series : retropolation 
+
+```{r}
+### Retropolation according to the working paper final series
+# You need first to calculate Made-In of manuf in rate and in level (see previous chunk)
+
+resMadeIn_manuf <- readRDS(paste0(PathTemp, "RESULT_MADEINs_Manuf.rds"))
+MadeIn_levels <- readRDS(paste0(PathTemp, "RESULT_MADEINs_Manuf_Niveau.rds"))
+
+resMadeIn_LRWIOD <- readRDS(paste0(PathTemp, "RESULT_MADEINs_LRWIOD.rds"))
+resMadeIn_WIOD <- readRDS(paste0(PathTemp, "RESULT_MADEINs_WIOD.rds"))
+resMadeIn_FIGARO <- readRDS(paste0(PathTemp, "RESULT_MADEINs_FIGARO.rds"))
+
+RetroMadeIn <- MadeIn_Retropolation(resMadeIn_manuf, MadeIn_levels, resMadeIn_LRWIOD, resMadeIn_WIOD, resMadeIn_FIGARO, resMadeIn_ICIO, OptSaveRDS = TRUE)
+
+# Rétropolation Made-In UE27
+resMadeInUE27_LRWIOD <- readRDS(paste0(PathTemp, "RESULT_MADEINsUE27_LRWIOD.rds"))
+resMadeInUE27_WIOD <- readRDS(paste0(PathTemp, "RESULT_MADEINsUE27_WIOD.rds"))
+resMadeInUE27_FIGARO <- readRDS(paste0(PathTemp, "RESULT_MADEINsUE27_FIGARO.rds"))
+resMadeInUE27_ICIO <- readRDS(paste0(PathTemp, "RESULT_MADEINsUE27_ICIO.rds"))
+
+RetroPo_MadeIn_UE27 <- MadeIn_Retropolation_UE27(resMadeInUE27_LRWIOD, resMadeInUE27_WIOD, resMadeInUE27_FIGARO, resMadeInUE27_ICIO, OptSaveRDS = TRUE)
+```
+
+
+##Content of VA embedded in exports : Adjustments on series : retropolation 
+
+```{r}
+# Retropolation of contents in VA of exports
+ContVAdesExports_LRWIOD <- readRDS(paste0(PathTest, "RESULT_ContVAdesExports_LRWIOD.rds"))
+ContVAdesExports_WIOD <- readRDS(paste0(PathTest, "RESULT_ContVAdesExports_WIOD.rds"))
+ContVAdesExports_FIGARO <- readRDS(paste0(PathTest, "RESULT_ContVAdesExports_FIGARO.rds"))
+
+Retropo_ContVA <- ContentVAExports_Retropolation(ContVAdesExports_LRWIOD, ContVAdesExports_WIOD, ContVAdesExports_FIGARO, OptSaveRDS = TRUE)
+
+
+# Retropolation of contents in VA of exports UE27
+resMadeInUE27_LRWIOD <- readRDS(paste0(PathTest, "RESULT_ContVAdesExportsUE27_LRWIOD.rds"))
+resMadeInUE27_WIOD <- readRDS(paste0(PathTest, "RESULT_ContVAdesExportsUE27_WIOD.rds"))
+resMadeInUE27_FIGARO <- readRDS(paste0(PathTest, "RESULT_ContVAdesExportsUE27_FIGARO.rds"))
+resMadeInUE27_ICIO <- readRDS(paste0(PathTest, "RESULT_ContVAdesExportsUE27_ICIO.rds"))
+
+Retropo_ContVA_UE27 <- ContentVAExports_Retropolation_UE27(resMadeInUE27_LRWIOD, resMadeInUE27_WIOD, resMadeInUE27_FIGARO, resMadeInUE27_ICIO, OptGraph = TRUE, OptSaveRDS = TRUE)
+```
+
+
+##Calculation of the content of foreign VA in French final demand, by country of origin
+
+```{r}
+# Calculs par pays de provenance ATTENTION : la base de départ byCountry a été construite pour la FRA, on pourrait la construire pour d'autres pays
+
+# Loading of normalized MRIO
+BDn_LR_WIOD <- readRDS("Sorties/BDn_LR_WIOD.rds")
+BDn_WIOD <- readRDS("Sorties/BDn_WIOD.rds")
+BDn_FIG <- readRDS("Sorties/BDn_FIG.rds")
+BDn_ICIO <- readRDS("Sorties/BDn_ICIO.rds")
+
+# Calculation of the content of foreign VA in French final demand by country of origin
+Build_MadeIn_byOrigin(BDn_LR_WIOD, BDn_WIOD, BDn_FIG, BDn_ICIO, SelectCountry = "FRA", OptSaveRDS = TRUE)
+SelectCountries <- c("FRA", "DEU", "GBR", "ESP", "ITA", "USA", "CHN")
+RESULT_MADEINs_byCountry <- readRDS(paste0(PathTemp, "RESULT_MADEINs_byCountry.rds"))
+MadeIn_FRA_byOrigin <- MadeIn_byOrigin(RESULT_MADEINs_byCountry, SelectCountries = c("FRA", "DEU", "GBR", "ESP", "ITA", "USA", "CHN"), MadeInOf = "FRA", OptSaveRDS = FALSE)
+```
+
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
+#3. Illustrations of the working paper
+
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
+Analysis of the content of foreign VA in French final demand by country of origin 
+Note : see previous chunk to build the result database
+
+```{r}
+DT <- readRDS("Sorties/RESULT_MADEINs_byCountry.rds")
+
+# Data manipulations
+DT_FRA <- DT[Col_Country == "FRA" & Lig_Country != "FRA", ]
+DT_FRA_TotByCountry <- DT_FRA[, sum(value), by = c("year", "base")]
+DT_FRA_tab <- dcast(DT_FRA, Lig_Country + base ~ year, var.value = "value")
+DT_FRA <- DT_FRA[DT_FRA_TotByCountry, on = .(year, base)]
+DT_FRA <- DT_FRA[, V1 := value / V1 * 100]
+setnames(DT_FRA, "V1", "valuePct")
+print(DT_FRA[, sum(valuePct), by = c("year", "base")]) # Controle Somme = 100
+DT_FRA_Pct <- DT_FRA[, value := NULL]
+DT_FRA_tabPct <- dcast(DT_FRA_Pct, Lig_Country + base ~ year, var.value = "valuePct")
+
+# Countries to select for this graph
+Select_Country <- c("FRA", "DEU", "GBR", "ESP", "ITA", "USA", "NLD", "CHN", "BEL")
+DT_FRA_Pct_LRWIOD <- DT_FRA_Pct[base == "LRWIOD" & year %in% 1965:1999 & Lig_Country %in% Select_Country, ]
+DT_FRA_Pct_WIOD <- DT_FRA_Pct[base == "WIOD" & year %in% 2000:2009 & Lig_Country %in% Select_Country, ]
+DT_FRA_Pct_FIGARO <- DT_FRA_Pct[base == "FIGARO" & year %in% 2010:2020 & Lig_Country %in% Select_Country, ]
+DT_FRA_Pct_select <- rbind(DT_FRA_Pct_LRWIOD, DT_FRA_Pct_WIOD, DT_FRA_Pct_FIGARO)
+
+DT_FRA_Pct_Interm <- DT_FRA_Pct_select[, sum(valuePct), by = c("year", "Col_Country", "base")]
+DT_FRA_Pct_Interm <- DT_FRA_Pct_Interm[, valuePct := 100 - V1][, Lig_Country := "ROW"] # ROW calculation : be careful because countries are different between MRIO, so ROW need to be recalculated.
+DT_FRA_Pct_Interm <- DT_FRA_Pct_Interm[, V1 := NULL]
+
+DT_FRA_Pct_select <- rbind(DT_FRA_Pct_select, DT_FRA_Pct_Interm)
+
+# Stacked + percent
+ggplot(DT_FRA_Pct_select, aes(fill = Lig_Country, y = valuePct, x = year)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_viridis(discrete = T) +
+  ggtitle("Content of foreign VA in French final demand by country of origin") +
+  theme_ipsum() +
+  xlab("")
+
+###############################################################################
+######### Function graph by country
+
+GraphMadeIn_byCountry <- function(pays, Select_Country = c("FRA", "DEU", "GBR", "ESP", "ITA", "USA", "NLD", "CHN", "BEL")) {
+  DT <- readRDS("RESULT_MADEINs_byCountry.rds")
+  DT_pays <- DT[Col_Country == pays & Lig_Country != pays, ]
+  DT_pays_TotByCountry <- DT_pays[, sum(value), by = c("year", "base")]
+  DT_pays_tab <- dcast(DT_pays, Lig_Country + base ~ year, var.value = "value")
+  DT_pays <- DT_pays[DT_pays_TotByCountry, on = .(year, base)]
+  DT_pays <- DT_pays[, V1 := value / V1 * 100]
+  setnames(DT_pays, "V1", "valuePct")
+  DT_pays_Pct <- DT_pays[, value := NULL]
+  DT_pays_tabPct <- dcast(DT_pays_Pct, Lig_Country + base ~ year, var.value = "valuePct")
+
+  DT_pays_Pct_LRWIOD <- DT_pays_Pct[base == "LRWIOD" & year %in% 1965:1999 & Lig_Country %in% Select_Country, ]
+  DT_pays_Pct_WIOD <- DT_pays_Pct[base == "WIOD" & year %in% 2000:2009 & Lig_Country %in% Select_Country, ]
+  DT_pays_Pct_FIGARO <- DT_pays_Pct[base == "FIGARO" & year %in% 2010:2020 & Lig_Country %in% Select_Country, ]
+  DT_pays_Pct_select <- rbind(DT_pays_Pct_LRWIOD, DT_pays_Pct_WIOD, DT_pays_Pct_FIGARO)
+
+  DT_pays_Pct_Interm <- DT_pays_Pct_select[, sum(valuePct), by = c("year", "Col_Country", "base")]
+  DT_pays_Pct_Interm <- DT_pays_Pct_Interm[, valuePct := 100 - V1][, Lig_Country := "ROW"]
+  DT_pays_Pct_Interm <- DT_pays_Pct_Interm[, V1 := NULL]
+  DT_pays_Pct_select <- rbind(DT_pays_Pct_select, DT_pays_Pct_Interm)
+
+  # Stacked + percent
+  p <- ggplot(DT_pays_Pct_select, aes(fill = Lig_Country, y = valuePct, x = year)) +
+    geom_bar(position = "stack", stat = "identity") +
+    scale_fill_viridis(discrete = T) +
+    ggtitle(paste0("Content of foreign VA in French final demand by country of origin ", pays)) +
+    theme_ipsum() +
+    xlab("")
+
+  print(p)
+
+  ggsave(paste0("MadeIn_ComplByCountry_", pays, ".png"), plot = last_plot(), device = "png")
+}
+
+GraphMadeIn_byCountry("FRA")
+GraphMadeIn_byCountry("ESP")
+GraphMadeIn_byCountry("ITA")
+GraphMadeIn_byCountry("GBR")
+GraphMadeIn_byCountry("DEU")
+GraphMadeIn_byCountry("CHN")
+GraphMadeIn_byCountry("USA")
+GraphMadeIn_byCountry("BEL")
+GraphMadeIn_byCountry("GRC")
+GraphMadeIn_byCountry("JPN")
+```
+
+##Another graph for the content of foreign VA in French final demand by country of origin
+
+```{r}
+Select_Country <- list("AUT", "BEL", "BGR", "CYP", "CZE", "DEU", "DNK", "ESP", "EST", "FIN", "FRA", "GRC", "HRV", "HUN", "IRL", "ITA", "LTU", "LUX", "LVA", "MLT", "NLD", "POL", "PRT", "ROU", "SVK", "SVN", "SWE")
+
+DT <- readRDS(paste0(PathTemp, "RESULT_MADEINs_byCountry.rds"))
+DT_pays <- DT[Col_Country == "FRA" & Lig_Country != "FRA", ]
+DT_pays_TotByCountry <- DT_pays[, sum(value), by = c("year", "base")]
+DT_pays_tab <- dcast(DT_pays, Lig_Country + base ~ year, var.value = "value")
+DT_pays <- DT_pays[DT_pays_TotByCountry, on = .(year, base)]
+DT_pays <- DT_pays[, V1 := value / V1 * 100]
+setnames(DT_pays, "V1", "valuePct")
+DT_pays_Pct <- DT_pays[, value := NULL]
+DT_pays_tabPct <- dcast(DT_pays_Pct, Lig_Country + base ~ year, var.value = "valuePct")
+
+DT_pays_Pct_LRWIOD <- DT_pays_Pct[base == "LRWIOD" & year %in% 1965:1999 & Lig_Country %in% Select_Country, ]
+DT_pays_Pct_WIOD <- DT_pays_Pct[base == "WIOD" & year %in% 2000:2009 & Lig_Country %in% Select_Country, ]
+DT_pays_Pct_FIGARO <- DT_pays_Pct[base == "FIGARO" & year %in% 2010:2020 & Lig_Country %in% Select_Country, ]
+DT_pays_Pct_select <- rbind(DT_pays_Pct_LRWIOD, DT_pays_Pct_WIOD, DT_pays_Pct_FIGARO)
+
+DT_pays_Pct_Interm <- DT_pays_Pct_select[, sum(valuePct), by = c("year", "Col_Country", "base")]
+DT_pays_Pct_Interm <- DT_pays_Pct_Interm[, valuePct := 100 - V1][, Lig_Country := "ROW"]
+DT_pays_Pct_Interm <- DT_pays_Pct_Interm[, V1 := NULL]
+DT_pays_Pct_select <- rbind(DT_pays_Pct_select, DT_pays_Pct_Interm)
+
+DT_pays_Pct_select_tab <- dcast(DT_pays_Pct_select, year ~ Lig_Country, value.var = "valuePct")
+
+print(rowSums(DT_pays_Pct_select_tab[, 2:8]))
+
+# Graph -> Excel ?
+write.xlsx(DT_pays_Pct_select_tab, "MadeIn_provenance_pour Graph.xlsx", sheetName = "serie", col.names = TRUE, row.names = TRUE)
+
+write.xlsx(DT_pays_Pct_select_tab, "SortieOuestFrance.xlsx", sheetName = "Made in FRA Provenance", col.names = TRUE, row.names = TRUE, append = TRUE)
+```
+
+
+##Analysis of Made-In France in comparison of countries of same size
+
+```{r}
+MadeInTotaux <- readRDS(paste0(PathTemp, "RESULT_MADEINs_TotauxAvecNiveaux.rds"))
+MadeInTotaux_select <- MadeInTotaux[Col_Country %in% c("FRA", "DEU", "GBR", "ESP", "ITA"), c("year", "Col_Country", "value")]
+MadeInTotaux_select <- MadeInTotaux_select[, year := as.numeric(as.character(year))]
+
+theme_set(theme_minimal(base_family = "Lato"))
+
+ggplot(MadeInTotaux_select, aes(x = year, y = value, group = Col_Country, color = Col_Country)) + #
+  geom_line(size = 1.5, alpha = 0.9, linetype = 1) +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    legend.background = element_rect(fill = "white", size = 4, colour = "white"),
+    legend.justification = c(0, 0),
+    legend.position = c(0, 0),
+    axis.ticks = element_line(colour = "grey70", size = 0.2),
+    panel.grid.major = element_line(colour = "grey70", size = 0.2),
+    panel.grid.minor = element_blank(),
+    panel.grid = element_line(
+      color = "#8ccde3",
+      size = 0.75,
+      linetype = 2
+    )
+  ) +
+  scale_x_continuous(n.breaks = 20) +
+  ggtitle("Made-in for France and comparable countries")
+
+
+ggsave(paste0("MadeIn_Graph1_FRA.png"), plot = last_plot(), device = "png")
+
+###################### Table of figures
+MadeInTotaux_select_tab <- dcast(MadeInTotaux_select, Col_Country ~ year, value.vars = "value")
+MadeInTotaux_select_tab3 <- MadeInTotaux_select_tab # init
+MadeInTotaux_select_tab3[, 2:ncol(MadeInTotaux_select_tab3)] <- round(MadeInTotaux_select_tab3[, 2:ncol(MadeInTotaux_select_tab3)], 3)
+
+MadeInTotaux_select_tab3 <- setDF(MadeInTotaux_select_tab3)
+MadeInTotaux_select_tab3 <- GetRownamesFromFirstCol(MadeInTotaux_select_tab3)
+MadeInTotaux_select_tab3 <- MadeInTotaux_select_tab3[, c("1965", "1975", "1985", "2000", "2005", "2010", "2015", "2020")]
+
+pander::pander(MadeInTotaux_select_tab3)
+pdf(paste0("MadeIn_Tab1_FRA.pdf")) # , height=15, width=8.5
+grid.table(MadeInTotaux_select_tab3)
+dev.off()
+
+write.xlsx(MadeInTotaux_select_tab3, "SortieOuestFrance.xlsx", sheetName = "Made in FRA", col.names = TRUE, row.names = TRUE, append = TRUE)
+```
+
+##Same analysis for EU27 and other comparable areas
+
+```{r}
+MadeInTotaux <- readRDS(paste0(PathTemp, "RESULT_MADEINs_UE27.rds"))
+MadeInTotaux_select <- MadeInTotaux[Col_Country %in% c("UE27", "USA", "CHN", "IND", "JPN", "BRA"), c("year", "Col_Country", "value")]
+MadeInTotaux_select <- MadeInTotaux_select[, year := as.numeric(as.character(year))]
+
+theme_set(theme_minimal(base_family = "Lato"))
+
+ggplot(MadeInTotaux_select, aes(x = year, y = value, group = Col_Country, color = Col_Country)) + #
+  geom_line(size = 1.5, alpha = 0.9, linetype = 1) +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    legend.background = element_rect(fill = "white", size = 4, colour = "white"),
+    legend.justification = c(0, 0),
+    legend.position = c(0, 0),
+    axis.ticks = element_line(colour = "grey70", size = 0.2),
+    panel.grid.major = element_line(colour = "grey70", size = 0.2),
+    panel.grid.minor = element_blank(),
+    panel.grid = element_line(
+      color = "#8ccde3",
+      size = 0.75,
+      linetype = 2
+    )
+  ) +
+  scale_x_continuous(n.breaks = 20) +
+  ggtitle("Made-in for EU27 and other comparable areas")
+
+ggsave(paste0("MadeIn_GraphCompl_GrandsPays.png"), plot = last_plot(), device = "png")
+
+###################### Table of figures
+MadeInTotaux_select_tab <- dcast(MadeInTotaux_select, Col_Country ~ year, value.vars = "value")
+MadeInTotaux_select_tab3 <- MadeInTotaux_select_tab # init
+MadeInTotaux_select_tab3[, 2:ncol(MadeInTotaux_select_tab3)] <- round(MadeInTotaux_select_tab3[, 2:ncol(MadeInTotaux_select_tab3)], 3)
+
+MadeInTotaux_select_tab3 <- setDF(MadeInTotaux_select_tab3)
+MadeInTotaux_select_tab3 <- GetRownamesFromFirstCol(MadeInTotaux_select_tab3)
+MadeInTotaux_select_tab3 <- MadeInTotaux_select_tab3[, c("1965", "1975", "1985", "2000", "2005", "2010", "2015", "2020")]
+
+pander::pander(MadeInTotaux_select_tab3)
+pdf(paste0("MadeIn_TabCompl_GrandsPays.pdf")) # , height=15, width=8.5
+grid.table(MadeInTotaux_select_tab3)
+dev.off()
+
+write.xlsx(MadeInTotaux_select_tab3, "SortieOuestFrance.xlsx", sheetName = "Made in UE", col.names = TRUE, row.names = TRUE)
+```
+
+
+
+##Analysis by industry structure for the French economy
+
+```{r}
+MadeInSectors <- readRDS(paste0(PathTemp, "RESULT_MADEINs_SectorsAvecNiveaux.rds"))
+MadeInSectors_select <- MadeInSectors[Col_Country %in% c("FRA"), c("year", "Col_Country", "value", "Lig_Indus", "TypeManuf")]
+MadeInSectors_select <- MadeInSectors_select[, year := as.numeric(as.character(year))]
+
+MadeInSectors_select1 <- MadeInSectors_select[TypeManuf == "manufCT", ]
+MadeInSectors_select2 <- MadeInSectors_select[TypeManuf == "manufIP19", ]
+
+MadeInSectors_select <- MadeInSectors_select[Lig_Indus %in% c("Agri", "Enrj", "Manuf", "ManufNonFab", "ManufFabC3C5", "Constru", "Services", "ServMarch", "ServNonMarch"), ]
+
+theme_set(theme_minimal(base_family = "Lato"))
+
+ggplot(MadeInSectors_select, aes(x = year, y = value, group = Lig_Indus, color = Lig_Indus)) + #
+  geom_line(size = 1.5, alpha = 0.9, linetype = 1) +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    legend.background = element_rect(fill = "white", size = 4, colour = "white"),
+    legend.justification = c(0, 0),
+    legend.position = c(0, 0),
+    axis.ticks = element_line(colour = "grey70", size = 0.2),
+    panel.grid.major = element_line(colour = "grey70", size = 0.2),
+    panel.grid.minor = element_blank(),
+    panel.grid = element_line(
+      color = "#8ccde3",
+      size = 0.75,
+      linetype = 2
+    )
+  ) +
+  scale_x_continuous(n.breaks = 20) +
+  ggtitle("Made-in France by industry")
+
+ggsave(paste0("MadeIn_Graph2_FRAsectors.png"), plot = last_plot(), device = "png")
+
+###################### Table of figures
+MadeInSectors_select2 <- unique(MadeInSectors_select[, TypeManuf := NULL])
+MadeInSectors_select_tab <- dcast(MadeInSectors_select2, Col_Country + Lig_Indus ~ year, value.vars = "value")
+MadeInSectors_select_tab <- MadeInSectors_select_tab[, Col_Country := paste0(Col_Country, "_", Lig_Indus)]
+MadeInSectors_select_tab <- MadeInSectors_select_tab[, Lig_Indus := NULL]
+MadeInSectors_select_tab3 <- MadeInSectors_select_tab # init
+MadeInSectors_select_tab3[, 2:ncol(MadeInSectors_select_tab3)] <- round(MadeInSectors_select_tab3[, 2:ncol(MadeInSectors_select_tab3)], 3)
+
+MadeInSectors_select_tab3 <- setDF(MadeInSectors_select_tab3)
+MadeInSectors_select_tab3 <- GetRownamesFromFirstCol(MadeInSectors_select_tab3)
+MadeInSectors_select_tab3 <- MadeInSectors_select_tab3[, c("1965", "1975", "1985", "2000", "2005", "2010", "2015", "2020")]
+
+pander::pander(MadeInSectors_select_tab3)
+pdf(paste0("MadeIn_Tab2_FRAsectors..pdf")) # , height=15, width=8.5
+grid.table(MadeInSectors_select_tab3)
+dev.off()
+
+#######################
+ggplot(MadeInSectors_select1, aes(x = year, y = value, group = Lig_Indus, color = Lig_Indus)) + #
+  geom_line(size = 1.5, alpha = 0.9, linetype = 1) +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    legend.background = element_rect(fill = "white", size = 4, colour = "white"),
+    legend.justification = c(0, 0),
+    legend.position = c(0, 0),
+    axis.ticks = element_line(colour = "grey70", size = 0.2),
+    panel.grid.major = element_line(colour = "grey70", size = 0.2),
+    panel.grid.minor = element_blank(),
+    panel.grid = element_line(
+      color = "#8ccde3",
+      size = 0.75,
+      linetype = 2
+    )
+  ) +
+  scale_x_continuous(n.breaks = 20) +
+  ggtitle("Made-in France : decompo 1")
+
+ggplot(MadeInSectors_select2, aes(x = year, y = value, group = Lig_Indus, color = Lig_Indus)) + #
+  geom_line(size = 1.5, alpha = 0.9, linetype = 1) +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    legend.background = element_rect(fill = "white", size = 4, colour = "white"),
+    legend.justification = c(0, 0),
+    legend.position = c(0, 0),
+    axis.ticks = element_line(colour = "grey70", size = 0.2),
+    panel.grid.major = element_line(colour = "grey70", size = 0.2),
+    panel.grid.minor = element_blank(),
+    panel.grid = element_line(
+      color = "#8ccde3",
+      size = 0.75,
+      linetype = 2
+    )
+  ) +
+  scale_x_continuous(n.breaks = 20) +
+  ggtitle("Made-in France : decompo 2")
+```
+
+
+##Content of VA in exports
+
+```{r}
+# Loading of data
+Data1 <- readRDS("RESULT_ContenusVAExport.rds")
+Data2 <- readRDS("RESULT_ContenusVAExport_UE27.rds")
+
+# Plots
+ggplot(data = Data1[CountryREF == "FRA", ], aes(x = year, y = value, color = CountryREF)) +
+  geom_line()
+
+ggplot(data = Data2[CountryREF == "FRA", ], aes(x = year, y = value, color = CountryREF)) +
+  geom_line()
+```

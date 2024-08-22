@@ -1,10 +1,10 @@
-# Avionics2
+# Avionics24
 
 ## Introduction
 
-Avionic2 manages MRIO databases for GVC and Ecological Footprint analysis
+Avionic24 manages MRIO databases for GVC and Ecological Footprint analysis
 
-Avionic 2 is a package designed to reproduce the results of the INSEE working paper "Made in France and reindustrialization: an approach using input-output tables" (Alexandre BOURGEOIS and Jeremi MONTORNES 2024).
+Avionic24 is a package designed to reproduce the results of the INSEE working paper "Made in France and reindustrialization: an approach using input-output tables" (Alexandre BOURGEOIS and Jeremi MONTORNES 2024).
 
 More generally, this package can also be used to manipulate multi-regional databases, to calculate carbon footprints using MRIO, to calculate structural path analysis (SPA), and to use the functions created as part of the working paper to apply the results to other countries, for example, or with additional modeling.
 
